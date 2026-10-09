@@ -1,0 +1,71 @@
+import json
+from typing import List, Optional, Union
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    # Application Metadata
+    APP_NAME: str = "Shadow AI Detector - Traffic Analyzer"
+    APP_VERSION: str = "0.1.0"
+    APP_ENV: str = "development"
+    DEBUG: bool = True
+    API_V1_STR: str = "/api/v1"
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+
+    # CORS Origins
+    BACKEND_CORS_ORIGINS: Union[List[str], str] = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            v_stripped = v.strip()
+            if v_stripped.startswith("[") and v_stripped.endswith("]"):
+                try:
+                    return json.loads(v_stripped)
+                except Exception:
+                    pass
+            return [i.strip() for i in v_stripped.split(",") if i.strip()]
+        elif isinstance(v, list):
+            return v
+        return []
+
+    # Database Settings
+    POSTGRES_SERVER: Optional[str] = None
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: Optional[str] = None
+    POSTGRES_PASSWORD: Optional[str] = None
+    POSTGRES_DB: Optional[str] = None
+    DATABASE_URL: Optional[str] = None
+
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: int = 30
+
+    @property
+    def sqlalchemy_database_uri(self) -> Optional[str]:
+        if self.DATABASE_URL:
+            # Handle postgres:// legacy prefixes if provided
+            if self.DATABASE_URL.startswith("postgres://"):
+                return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
+            return self.DATABASE_URL
+        if self.POSTGRES_SERVER and self.POSTGRES_USER and self.POSTGRES_DB:
+            password_part = f":{self.POSTGRES_PASSWORD}" if self.POSTGRES_PASSWORD else ""
+            return f"postgresql://{self.POSTGRES_USER}{password_part}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        return None
+
+
+settings = Settings()
