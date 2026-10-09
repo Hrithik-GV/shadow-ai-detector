@@ -16,7 +16,7 @@ from app.schemas.traffic import RecordValidationError
 from app.schemas.traffic_api import TrafficMetricsSummary
 from app.services.ingestion import IngestionResult, TrafficIngestionService
 from app.services.ai_detector import default_detector
-from app.services.risk_engine import default_risk_engine, EndpointTrafficAggregate
+from app.services.risk_engine import RiskEngine, default_risk_engine, EndpointTrafficAggregate
 from app.services.traffic_summary_service import TrafficSummaryService
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ def process_and_persist_traffic_file(
             # Step 3.5: Run AI Detection and Risk Assessment on valid records
             endpoint_aggregates: Dict[str, EndpointTrafficAggregate] = {}
             detector = default_detector
-            risk_engine = default_risk_engine
+            risk_engine = RiskEngine(db=db)
 
             for rec in ingestion_result.valid_records:
                 target_host = rec.destination_domain or rec.sni_hostname

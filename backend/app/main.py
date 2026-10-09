@@ -103,6 +103,10 @@ def create_application() -> FastAPI:
     from app.api.v1.endpoints.reports import router as reports_router
     application.include_router(reports_router, prefix="/api/reports", tags=["Reports"])
 
+    from app.api.v1.endpoints.policies import router as policies_router
+    application.include_router(policies_router, prefix="/api/policies", tags=["Policies"])
+
+
     @application.get("/", tags=["Root"])
     def root():
         return {

@@ -111,9 +111,13 @@ class RiskEngine:
     def __init__(
         self,
         approved_providers: Optional[List[str]] = None,
+        blocked_providers: Optional[List[str]] = None,
         registry: Optional[AIProviderRegistry] = None,
+        db: Optional[Any] = None,
     ) -> None:
         self.registry = registry or default_registry
+        self.db = db
+        self.blocked_providers = [p.strip() for p in (blocked_providers or [])]
         self.approved_providers = (
             approved_providers
             if approved_providers is not None
@@ -125,11 +129,33 @@ class RiskEngine:
         agg: EndpointTrafficAggregate,
     ) -> tuple[EvaluatedEndpointInventory, Optional[EvaluatedRiskFinding]]:
         """Evaluates an aggregated AI endpoint and determines risk score, level, and findings."""
-        is_approved = self.registry.is_provider_approved(
-            agg.provider,
-            self.approved_providers,
-        )
-        approval_status = "approved" if is_approved else "unapproved"
+        if self.db is not None:
+            from app.services.policy_service import PolicyService
+            is_approved, approval_status, resolved_policy_rule = PolicyService.resolve_effective_approval(
+                self.db,
+                provider_name=agg.provider,
+                target_domain=agg.target,
+            )
+        else:
+            # Deterministic conflict resolution: blocked strictly overrides approved
+            is_blocked = any(
+                b.lower() == agg.provider.lower() for b in self.blocked_providers
+            )
+            if is_blocked:
+                is_approved = False
+                approval_status = "blocked"
+                resolved_policy_rule = "POLICY-AI-01: Prohibited Shadow AI Provider"
+            else:
+                is_approved = self.registry.is_provider_approved(
+                    agg.provider,
+                    self.approved_providers,
+                )
+                approval_status = "approved" if is_approved else "unapproved"
+                resolved_policy_rule = (
+                    "POLICY-AI-00: Approved Enterprise Provider"
+                    if is_approved
+                    else "POLICY-AI-01: Unapproved Shadow AI Provider"
+                )
 
         raw_score = 0
         reasons: List[str] = []
@@ -149,7 +175,7 @@ class RiskEngine:
             # Baseline unapproved Shadow AI policy violation
             policy_points = 50
             raw_score += policy_points
-            policy_rule = "POLICY-AI-01: Unapproved Shadow AI Provider"
+            policy_rule = resolved_policy_rule or "POLICY-AI-01: Unapproved Shadow AI Provider"
             reasons.append(
                 f"Unapproved shadow AI service: '{agg.provider}' is not listed in the approved organizational AI registry."
             )
@@ -165,7 +191,7 @@ class RiskEngine:
             )
         else:
             policy_points = 0
-            policy_rule = "POLICY-AI-00: Approved Enterprise AI Service"
+            policy_rule = resolved_policy_rule or "POLICY-AI-00: Approved Enterprise AI Service"
             reasons.append(f"Authorized enterprise AI service: '{agg.provider}' is approved for business use.")
             contributing_factors.append({
                 "factor": "Policy Compliance",
@@ -174,6 +200,7 @@ class RiskEngine:
                 "description": f"Authorized AI provider '{agg.provider}' approved for business use.",
             })
             description = f"Authorized AI provider '{agg.provider}' observed at '{agg.target}'."
+
 
         # 2. Data Egress Volume Rule (Prompt Injection / Sensitive Data Leakage Risk)
         egress_points = 0

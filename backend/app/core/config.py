@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    # Administrative Authorization Key (configurable via ADMIN_API_KEY env var)
+    ADMIN_API_KEY: str = "shadow-ai-admin-secret-key"
+
     # Ingestion & Upload Limits
     MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
     MAX_INGESTION_ROWS: int = 100_000  # 100,000 records

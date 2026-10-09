@@ -313,3 +313,83 @@ export interface TestEvaluationMetrics {
   categoriesBreakdown?: Record<string, number>;
 }
 
+/**
+ * AI Governance Policy Types (GET /api/policies)
+ */
+export type PolicyApprovalStatus = 'approved' | 'unapproved' | 'blocked' | 'restricted';
+
+export interface AIGovernancePolicy {
+  id: string;
+  externalId?: string;
+  external_id?: string;
+  providerName?: string;
+  provider_name?: string;
+  domainSignatures?: string[];
+  domain_signatures?: string[];
+  approvalStatus?: PolicyApprovalStatus;
+  approval_status?: PolicyApprovalStatus;
+  isApproved?: boolean;
+  is_approved?: boolean;
+  isEnabled?: boolean;
+  is_enabled?: boolean;
+  policyRule?: string;
+  policy_rule?: string;
+  description?: string | null;
+  createdBy?: string | null;
+  created_by?: string | null;
+  updatedBy?: string | null;
+  updated_by?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+}
+
+export interface PolicyAuditLog {
+  id: string;
+  policyId?: string | null;
+  policy_id?: string | null;
+  action: string;
+  providerName?: string;
+  provider_name?: string;
+  previousState?: Record<string, unknown> | null;
+  previous_state?: Record<string, unknown> | null;
+  newState?: Record<string, unknown> | null;
+  new_state?: Record<string, unknown> | null;
+  performedBy?: string;
+  performed_by?: string;
+  details?: string | null;
+  timestamp: string;
+}
+
+export interface PolicySummaryMetrics {
+  totalPolicies?: number;
+  total_policies?: number;
+  approvedPolicies?: number;
+  approved_policies?: number;
+  unapprovedPolicies?: number;
+  unapproved_policies?: number;
+  disabledPolicies?: number;
+  disabled_policies?: number;
+  activeApprovedProviders?: string[];
+  active_approved_providers?: string[];
+}
+
+export interface PolicyCreatePayload {
+  provider_name: string;
+  domain_signatures: string[];
+  approval_status: PolicyApprovalStatus;
+  is_enabled?: boolean;
+  policy_rule?: string;
+  description?: string;
+}
+
+export interface PolicyUpdatePayload {
+  provider_name?: string;
+  domain_signatures?: string[];
+  approval_status?: PolicyApprovalStatus;
+  is_enabled?: boolean;
+  policy_rule?: string;
+  description?: string;
+}
+
