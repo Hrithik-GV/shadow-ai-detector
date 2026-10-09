@@ -45,6 +45,34 @@ export interface RecentlyObservedEndpoint {
  * Dashboard summary statistics (GET /api/dashboard/stats)
  */
 export interface DashboardStats {
+  // Backend actual fields from GET /api/dashboard/stats
+  scope?: string;
+  analysis_id?: string;
+  analyses_count?: number;
+  scope_description?: string;
+  total_records_received?: number;
+  valid_records?: number;
+  rejected_records?: number;
+  unique_source_ips?: number;
+  unique_destination_ips?: number;
+  unique_destination_domains?: number;
+  total_bytes_sent?: number;
+  total_bytes_received?: number;
+  bytes_sent_reported_count?: number;
+  bytes_received_reported_count?: number;
+  missing_bytes_sent_count?: number;
+  missing_bytes_received_count?: number;
+  protocols?: string[];
+  protocol_distribution?: Record<string, number>;
+  missing_protocol_count?: number;
+  earliest_timestamp?: string;
+  latest_timestamp?: string;
+  records_with_timestamp?: number;
+  missing_timestamp_count?: number;
+  record_type_note?: string;
+  byte_calculation_note?: string;
+
+  // Frontend aliases and optional extensions
   totalTrafficEvents?: number;
   totalAnalyzedRecords?: number;
   totalTrafficRecords?: number;

@@ -30,20 +30,25 @@ export const DashboardPage: React.FC = () => {
 
   // Safely extract backend numbers without fabricating any defaults
   const totalTraffic =
+    stats?.valid_records ??
+    stats?.total_records_received ??
     stats?.totalAnalyzedRecords ??
     stats?.totalTrafficEvents ??
     stats?.totalTrafficRecords;
 
   const aiRelatedRecords =
+    stats?.valid_records ??
     stats?.aiRelatedRecords ??
     stats?.aiTrafficEvents ??
     stats?.aiFlowsCount;
 
   const totalEndpoints =
+    stats?.unique_destination_domains ??
     stats?.totalAiEndpoints ??
     stats?.totalEndpoints;
 
   const activeProviders =
+    stats?.unique_destination_domains ??
     stats?.activeProvidersCount ??
     stats?.totalProviders;
 
@@ -55,6 +60,14 @@ export const DashboardPage: React.FC = () => {
   const mediumRisks = stats?.riskBreakdown?.medium ?? stats?.mediumRiskCount;
   const lowRisks = stats?.riskBreakdown?.low ?? stats?.lowRiskCount;
   const criticalRisks = stats?.riskBreakdown?.critical ?? stats?.criticalRiskCount;
+
+  const lastTimestamp = stats?.lastAnalysisTimestamp || stats?.latest_timestamp;
+
+  const distributionData =
+    stats?.providerDistribution ||
+    (stats?.protocol_distribution && Object.keys(stats.protocol_distribution).length > 0
+      ? stats.protocol_distribution
+      : undefined);
 
   // Has risk breakdown data from backend
   const hasRiskBreakdown =
@@ -108,10 +121,10 @@ export const DashboardPage: React.FC = () => {
               {API_BASE_URL}
             </span>
           </div>
-          {stats?.lastAnalysisTimestamp && (
+          {lastTimestamp && (
             <div className="flex items-center gap-2 text-[#9A9A91]">
               <Clock className="w-3.5 h-3.5 text-[#FFCC00]" />
-              <span>Last Analysis: {stats.lastAnalysisTimestamp}</span>
+              <span>Last Analysis: {lastTimestamp}</span>
             </div>
           )}
         </div>
@@ -286,14 +299,18 @@ export const DashboardPage: React.FC = () => {
             </Card>
           )}
 
-          {/* 6. Provider Distribution (rendered only when backend provides aggregated data) */}
-          {stats.providerDistribution && (
+          {/* 6. Distribution (rendered when backend provides provider or protocol aggregated data) */}
+          {distributionData && (
             <Card
               variant="surface"
-              title="Provider Distribution"
-              subtitle="Aggregated traffic proportion across identified AI foundation vendors."
+              title={stats.providerDistribution ? "Provider Distribution" : "Network Protocol Distribution"}
+              subtitle={
+                stats.providerDistribution
+                  ? "Aggregated traffic proportion across identified AI foundation vendors."
+                  : "Observed network protocols distribution derived from processed traffic flows."
+              }
             >
-              <ProviderDistributionBars data={stats.providerDistribution} />
+              <ProviderDistributionBars data={distributionData} />
             </Card>
           )}
 
