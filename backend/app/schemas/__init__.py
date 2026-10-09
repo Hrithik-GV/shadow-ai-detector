@@ -10,6 +10,15 @@ from app.schemas.traffic import (
     validate_traffic_batch,
     validate_traffic_record,
 )
+from app.schemas.traffic_api import (
+    PaginatedTrafficAnalysesResponse,
+    PaginatedTrafficRecordsResponse,
+    TrafficAnalysisDetailResponse,
+    TrafficAnalysisListItem,
+    TrafficAnalyzeResponse,
+    TrafficMetricsSummary,
+    TrafficRecordResponse,
+)
 
 __all__ = [
     "ComponentStatus",
@@ -23,4 +32,11 @@ __all__ = [
     "COLUMN_ALIASES",
     "validate_traffic_record",
     "validate_traffic_batch",
+    "TrafficMetricsSummary",
+    "TrafficRecordResponse",
+    "TrafficAnalysisListItem",
+    "TrafficAnalysisDetailResponse",
+    "TrafficAnalyzeResponse",
+    "PaginatedTrafficRecordsResponse",
+    "PaginatedTrafficAnalysesResponse",
 ]

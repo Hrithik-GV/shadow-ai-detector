@@ -163,6 +163,183 @@ Implemented in [`app/services/ingestion.py`](file:///c:/projects/shadow-ai-detec
 
 ---
 
+## Traffic Analysis API Endpoints
+
+### 1. `POST /api/traffic/analyze`
+Accepts a single `.csv`, `.json`, `.jsonl`, or `.ndjson` capture file via multipart form data (`file`), parses rows, and persists valid records to PostgreSQL.
+
+**Example Request:**
+```bash
+curl -X POST "http://localhost:8000/api/traffic/analyze" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@proxy_logs.csv;type=text/csv"
+```
+
+**Example Response (`201 Created`):**
+```json
+{
+  "id": "e8d67a14-8f4b-4b12-b13c-7501062089f3",
+  "original_filename": "proxy_logs.csv",
+  "file_format": "csv",
+  "status": "completed",
+  "total_rows_received": 3,
+  "valid_rows": 2,
+  "rejected_rows": 1,
+  "error_details": null,
+  "created_at": "2026-10-09T23:00:00Z",
+  "updated_at": "2026-10-09T23:00:01Z",
+  "summary": {
+    "total_valid_records": 2,
+    "total_bytes_sent": 2000,
+    "total_bytes_received": 57000,
+    "unique_source_ips": 2,
+    "unique_destination_domains": 2,
+    "unique_destination_ips": 0,
+    "protocols": ["TCP"],
+    "earliest_timestamp": "2026-10-09T18:00:00Z",
+    "latest_timestamp": "2026-10-09T18:01:00Z"
+  },
+  "rejected_records": [
+    {
+      "row_index": 3,
+      "errors": [
+        {
+          "field": "destination_ip",
+          "message": "Invalid IP address: '999.999.999.999'",
+          "invalid_value": "999.999.999.999"
+        }
+      ],
+      "raw_record": {
+        "src_ip": "10.0.0.1",
+        "destination_ip": "999.999.999.999",
+        "Authorization": "[REDACTED]"
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 2. `GET /api/traffic/{analysis_id}`
+Retrieves a single saved analysis by ID, returning its status, file metadata, counts, and actual metrics derived from PostgreSQL.
+
+**Example Request:**
+```bash
+curl "http://localhost:8000/api/traffic/e8d67a14-8f4b-4b12-b13c-7501062089f3"
+```
+
+**Example Response (`200 OK`):**
+```json
+{
+  "id": "e8d67a14-8f4b-4b12-b13c-7501062089f3",
+  "original_filename": "proxy_logs.csv",
+  "file_format": "csv",
+  "status": "completed",
+  "total_rows_received": 3,
+  "valid_rows": 2,
+  "rejected_rows": 1,
+  "error_details": null,
+  "created_at": "2026-10-09T23:00:00Z",
+  "updated_at": "2026-10-09T23:00:01Z",
+  "summary": {
+    "total_valid_records": 2,
+    "total_bytes_sent": 2000,
+    "total_bytes_received": 57000,
+    "unique_source_ips": 2,
+    "unique_destination_domains": 2,
+    "unique_destination_ips": 0,
+    "protocols": ["TCP"],
+    "earliest_timestamp": "2026-10-09T18:00:00Z",
+    "latest_timestamp": "2026-10-09T18:01:00Z"
+  }
+}
+```
+*Returns `404 Not Found` if `analysis_id` does not exist.*
+
+---
+
+### 3. `GET /api/traffic/{analysis_id}/records`
+Returns individual persisted records for an analysis with pagination support.
+
+**Parameters:**
+- `limit`: Number of records to return (Default: `50`, Min: `1`, Max: `500`).
+- `offset`: Zero-based pagination offset (Default: `0`).
+
+**Example Request:**
+```bash
+curl "http://localhost:8000/api/traffic/e8d67a14-8f4b-4b12-b13c-7501062089f3/records?limit=2&offset=0"
+```
+
+**Example Response (`200 OK`):**
+```json
+{
+  "analysis_id": "e8d67a14-8f4b-4b12-b13c-7501062089f3",
+  "total_records": 2,
+  "limit": 2,
+  "offset": 0,
+  "records": [
+    {
+      "id": "18cfc527-2c93-4a11-b0fe-25a805fef914",
+      "analysis_id": "e8d67a14-8f4b-4b12-b13c-7501062089f3",
+      "timestamp": "2026-10-09T18:00:00Z",
+      "source_ip": "192.168.1.50",
+      "destination_ip": null,
+      "destination_domain": "api.openai.com",
+      "destination_port": 443,
+      "protocol": "TCP",
+      "bytes_sent": 1200,
+      "bytes_received": 45000,
+      "http_method": null,
+      "http_uri": null,
+      "http_status_code": null,
+      "user_agent": null,
+      "sni_hostname": null
+    }
+  ]
+}
+```
+
+---
+
+### 4. `GET /api/traffic`
+Returns analysis run history ordered by creation time descending.
+
+**Parameters:**
+- `limit`: Number of jobs per page (Default: `20`, Min: `1`, Max: `100`).
+- `offset`: Zero-based pagination offset (Default: `0`).
+
+**Example Request:**
+```bash
+curl "http://localhost:8000/api/traffic?limit=10&offset=0"
+```
+
+**Example Response (`200 OK`):**
+```json
+{
+  "total_analyses": 5,
+  "limit": 10,
+  "offset": 0,
+  "analyses": [
+    {
+      "id": "e8d67a14-8f4b-4b12-b13c-7501062089f3",
+      "original_filename": "proxy_logs.csv",
+      "file_format": "csv",
+      "status": "completed",
+      "total_rows_received": 3,
+      "valid_rows": 2,
+      "rejected_rows": 1,
+      "error_details": null,
+      "created_at": "2026-10-09T23:00:00Z",
+      "updated_at": "2026-10-09T23:00:01Z"
+    }
+  ]
+}
+```
+
+---
+
 ## Getting Started
 
 ### 1. Prerequisites

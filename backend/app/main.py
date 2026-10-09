@@ -59,6 +59,10 @@ def create_application() -> FastAPI:
     # Mount API v1 router
     application.include_router(api_v1_router, prefix=settings.API_V1_STR)
 
+    # Mount unversioned /api/traffic endpoint path as specified in the API contract
+    from app.api.v1.endpoints.traffic import router as traffic_router
+    application.include_router(traffic_router, prefix="/api/traffic", tags=["Traffic"])
+
     @application.get("/", tags=["Root"])
     def root():
         return {

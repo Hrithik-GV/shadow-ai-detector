@@ -33,9 +33,12 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
     MAX_INGESTION_ROWS: int = 100_000  # 100,000 records
 
-    # CORS Origins
+    # CORS Origins (React Vite: 5173, CRA/Next: 3000, API: 8000)
     BACKEND_CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
     ]
