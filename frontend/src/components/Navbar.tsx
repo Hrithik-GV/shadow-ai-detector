@@ -19,8 +19,8 @@ const routeTitles: Record<string, { title: string; breadcrumb: string }> = {
 export const Navbar: React.FC<NavbarProps> = ({ onOpenMobile }) => {
   const location = useLocation();
   const currentRoute = routeTitles[location.pathname] || {
-    title: 'Console',
-    breadcrumb: 'CONSOLE',
+    title: 'Page Not Found',
+    breadcrumb: 'CONSOLE > 404 NOT FOUND',
   };
 
   return (

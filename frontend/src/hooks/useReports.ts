@@ -4,11 +4,11 @@ import type { TestEvaluationMetrics, ApiError } from '../types';
 
 export const REPORTS_METRICS_QUERY_KEY = ['reports', 'metrics'] as const;
 
-export function useReportMetrics() {
+export function useReportMetrics(options?: { retry?: boolean | number }) {
   return useQuery<TestEvaluationMetrics, ApiError>({
     queryKey: REPORTS_METRICS_QUERY_KEY,
     queryFn: getReportMetrics,
-    retry: 1,
+    retry: options?.retry ?? 1,
     staleTime: 60000,
   });
 }

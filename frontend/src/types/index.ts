@@ -213,11 +213,22 @@ export interface RiskAssessment {
  * Test & evaluation metrics report (GET /api/reports/metrics)
  */
 export interface TestEvaluationMetrics {
-  totalEvaluations: number;
-  detectionAccuracy?: number;
+  totalEvaluations?: number;
+  datasetSize?: number;
+  evaluatedRecordsCount?: number;
+  precision?: number;
+  detectionPrecision?: number;
+  recall?: number;
+  detectionRecall?: number;
   falsePositiveRate?: number;
+  fpr?: number;
+  providerAccuracy?: number;
+  providerIdentificationAccuracy?: number;
+  detectionAccuracy?: number;
   averageLatencyMs?: number;
   analyzedDataVolumeMb?: number;
+  timestamp?: string;
+  evaluatedAt?: string;
   lastGeneratedAt?: string;
   categoriesBreakdown?: Record<string, number>;
 }

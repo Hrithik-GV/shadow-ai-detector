@@ -1,94 +1,201 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PageContainer } from '../components/common/PageContainer';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
+import { useApiHealth } from '../hooks/useApiHealth';
 import { API_BASE_URL } from '../lib/config';
-import { Server, Sliders, Shield } from 'lucide-react';
+import {
+  Server,
+  Sliders,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  RefreshCw,
+  Info,
+  ShieldCheck,
+  RotateCcw,
+} from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
+  const { data: healthData, isLoading, isError, refetch, isFetching } = useApiHealth();
+
+  // Local client preference states (stored locally in localStorage)
+  const [sidebarPreference, setSidebarPreference] = useState<string>(() => {
+    return localStorage.getItem('shadow_ai_sidebar_collapsed') === 'true'
+      ? 'collapsed'
+      : 'expanded';
+  });
+
+  const [notificationState, setNotificationState] = useState<string | null>(null);
+
+  const handleSidebarPreferenceChange = (val: string) => {
+    setSidebarPreference(val);
+    localStorage.setItem('shadow_ai_sidebar_collapsed', val === 'collapsed' ? 'true' : 'false');
+    setNotificationState('Local preference saved. Reload to apply across entire session.');
+    setTimeout(() => setNotificationState(null), 4000);
+  };
+
+  const handleResetPreferences = () => {
+    localStorage.removeItem('shadow_ai_sidebar_collapsed');
+    setSidebarPreference('expanded');
+    setNotificationState('Local client preferences reset to defaults.');
+    setTimeout(() => setNotificationState(null), 4000);
+  };
+
+  // Sanitize URL for display so no sensitive auth info (e.g. user:pass@) is exposed
+  const sanitizedApiUrl = React.useMemo(() => {
+    try {
+      const parsed = new URL(API_BASE_URL);
+      return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+    } catch {
+      return API_BASE_URL;
+    }
+  }, []);
+
   return (
     <PageContainer
       title="Settings"
-      description="Configure backend API connection bindings, collector agent parameters, and detection policies."
+      description="Configure local frontend console preferences, verify API connectivity, and review client communication bindings."
       badge={<Badge variant="accent">SYS CONFIG</Badge>}
     >
       <div className="space-y-6">
-        {/* Backend API Configuration */}
+        {notificationState && (
+          <div className="p-3 bg-[#0D0D0D] border-2 border-[#FFCC00] text-[#FFCC00] font-mono text-xs flex items-center justify-between shadow-[3px_3px_0_#735C00]">
+            <span>{notificationState}</span>
+            <Button variant="outline" size="sm" onClick={() => setNotificationState(null)}>
+              DISMISS
+            </Button>
+          </div>
+        )}
+
+        {/* 1. API Connectivity & Backend Binding */}
         <Card
           variant="charcoal"
           title="Backend Ingestion Binding"
-          subtitle="Configured host URL used for API queries and packet telemetry streams."
+          subtitle="Target URL used for REST queries, live packet telemetry, and status probes."
           headerIcon={<Server className="w-5 h-5 text-[#FFCC00]" />}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              icon={<RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />}
+            >
+              RETEST CONNECTION
+            </Button>
+          }
         >
           <div className="space-y-4 font-mono text-xs">
             <div className="space-y-1.5">
-              <label className="text-[#9A9A91] uppercase tracking-wider block text-[10px]">
-                API Base URL (from VITE_API_BASE_URL)
+              <label className="text-[#9A9A91] text-[10px] uppercase tracking-wider block">
+                Configured Backend Endpoint (VITE_API_BASE_URL)
               </label>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex items-center gap-3">
                 <input
                   type="text"
                   readOnly
-                  value={API_BASE_URL}
+                  value={sanitizedApiUrl}
                   className="flex-1 bg-[#0D0D0D] border border-[#333330] px-3 py-2 text-[#F4F4F0] font-mono text-xs select-all outline-none focus:border-[#FFCC00]"
                 />
-                <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
-                  RETEST CONNECTION
-                </Button>
+                <div className="shrink-0">
+                  {isLoading && (
+                    <Badge variant="warning" size="md" icon={<Loader2 className="w-3 h-3 animate-spin" />}>
+                      CHECKING
+                    </Badge>
+                  )}
+                  {isError && (
+                    <Badge variant="danger" size="md" icon={<XCircle className="w-3 h-3" />}>
+                      OFFLINE
+                    </Badge>
+                  )}
+                  {healthData && !isLoading && !isError && (
+                    <Badge variant="success" size="md" icon={<CheckCircle2 className="w-3 h-3" />}>
+                      CONNECTED
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
-            <p className="text-[11px] text-[#9A9A91] leading-relaxed">
-              To change this endpoint, update <code className="bg-[#0D0D0D] px-1 py-0.5 border border-[#333330] text-[#FFCC00]">VITE_API_BASE_URL</code> in your <code className="bg-[#0D0D0D] px-1 py-0.5 border border-[#333330] text-[#FFCC00]">.env</code> file and restart the Vite development server.
-            </p>
+
+            <div className="p-3 bg-[#0D0D0D] border border-[#333330] text-[11px] text-[#9A9A91] space-y-1">
+              <div className="flex items-center gap-1.5 text-[#F4F4F0]">
+                <Info className="w-3.5 h-3.5 text-[#FFCC00]" />
+                <span className="font-bold">Environment Configuration Guidance:</span>
+              </div>
+              <p>
+                To bind the frontend to a remote or containerized detector, update{' '}
+                <code className="text-[#FFCC00]">VITE_API_BASE_URL</code> in your{' '}
+                <code className="text-[#FFCC00]">.env</code> file and restart Vite. Real secrets or tokens are never committed.
+              </p>
+            </div>
           </div>
         </Card>
 
-        {/* Network Collector Agent Settings */}
+        {/* 2. Client Interface Preferences (Local Storage) */}
         <Card
           variant="surface"
-          title="Telemetry Collector Configuration"
-          subtitle="Settings for local TAP, eBPF agent, or mirrored interface stream."
+          title="Console Display Preferences"
+          subtitle="Client-side interface options saved in your local browser storage."
           headerIcon={<Sliders className="w-5 h-5 text-[#FFCC00]" />}
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<RotateCcw className="w-3.5 h-3.5" />}
+              onClick={handleResetPreferences}
+            >
+              RESET DEFAULTS
+            </Button>
+          }
         >
           <div className="space-y-4 font-mono text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <span className="text-[#9A9A91] uppercase tracking-wider block text-[10px]">
-                  Collector Mode
-                </span>
-                <span className="text-[#F4F4F0] bg-[#0D0D0D] border border-[#333330] px-3 py-2 block">
-                  PASSIVE DNS & SNI INSPECTION
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#0D0D0D] border border-[#333330]">
+              <div>
+                <span className="text-[#F4F4F0] font-bold block">Navigation Sidebar Default</span>
+                <span className="text-[#9A9A91] text-[11px]">
+                  Choose whether the sidebar starts expanded or collapsed by default.
                 </span>
               </div>
-              <div className="space-y-1">
-                <span className="text-[#9A9A91] uppercase tracking-wider block text-[10px]">
-                  Ingestion Port
-                </span>
-                <span className="text-[#F4F4F0] bg-[#0D0D0D] border border-[#333330] px-3 py-2 block">
-                  8000 (HTTP / SSE)
+              <select
+                value={sidebarPreference}
+                onChange={(e) => handleSidebarPreferenceChange(e.target.value)}
+                className="bg-[#171716] border border-[#333330] px-3 py-1.5 text-[#F4F4F0] font-mono text-xs focus:outline-none focus:border-[#FFCC00]"
+              >
+                <option value="expanded">EXPANDED (256px)</option>
+                <option value="collapsed">COLLAPSED (72px)</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#0D0D0D] border border-[#333330]">
+              <div>
+                <span className="text-[#F4F4F0] font-bold block">TanStack Query Cache Window</span>
+                <span className="text-[#9A9A91] text-[11px]">
+                  Default query freshness window before automatic background revalidation.
                 </span>
               </div>
+              <Badge variant="muted" size="md">
+                60 SECONDS (DEFAULT)
+              </Badge>
             </div>
           </div>
         </Card>
 
-        {/* Security Policy Rules */}
+        {/* 3. Server-Side Policy Notice */}
         <Card
           variant="surface"
-          title="Default Detection Policy"
-          subtitle="Global classification rules applied to detected AI traffic."
-          headerIcon={<Shield className="w-5 h-5 text-[#FFCC00]" />}
+          title="Policy & Approval Enforcement"
+          subtitle="Architectural information regarding security rules and approval workflows."
+          headerIcon={<ShieldCheck className="w-5 h-5 text-[#FFCC00]" />}
         >
-          <div className="space-y-3 font-mono text-xs text-[#9A9A91]">
-            <div className="flex items-center justify-between p-3 bg-[#0D0D0D] border border-[#333330]">
-              <span>Flag unknown external AI providers as UNAPPROVED</span>
-              <Badge variant="accent">ENABLED</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-[#0D0D0D] border border-[#333330]">
-              <span>Alert on sensitive payload egress to unapproved LLMs</span>
-              <Badge variant="accent">ENABLED</Badge>
-            </div>
+          <div className="p-3 bg-[#0D0D0D] border border-[#333330] text-[11px] font-mono text-[#9A9A91] space-y-2">
+            <p className="text-[#F4F4F0] leading-relaxed">
+              Provider approval status, risk threshold weights, and data loss prevention policies are strictly evaluated and governed by the backend detection service.
+            </p>
+            <p>
+              In accordance with project constraints, the frontend does not implement mock approval buttons or fake policy editing toggles without corresponding backend management endpoints.
+            </p>
           </div>
         </Card>
       </div>

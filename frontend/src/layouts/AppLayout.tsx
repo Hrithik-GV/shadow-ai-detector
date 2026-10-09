@@ -3,6 +3,8 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { Navbar } from '../components/Navbar';
 
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
+
 export const AppLayout: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('shadow_ai_sidebar_collapsed') === 'true';
@@ -31,7 +33,9 @@ export const AppLayout: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         <Navbar onOpenMobile={() => setIsMobileOpen(true)} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          <Outlet />
+          <ErrorBoundary fallbackTitle="Console Module Error">
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
