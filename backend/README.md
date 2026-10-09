@@ -141,6 +141,28 @@ Incoming network records are parsed, alias-normalized, and validated using Pydan
 
 ---
 
+## Traffic File Ingestion Service
+
+Implemented in [`app/services/ingestion.py`](file:///c:/projects/shadow-ai-detector/backend/app/services/ingestion.py), the ingestion service is decoupled from HTTP transport and can parse bytes, strings, or file streams directly.
+
+### Supported File Formats
+1. **CSV (`.csv`)**: Header row required. Parses arbitrary delimiter formats and handles duplicate column headers safely using Pandas with `dtype=str`. Supports UTF-8 and UTF-8-SIG (Excel BOM).
+2. **JSON (`.json`)**:
+   - Standard array of objects: `[ { ... }, { ... } ]`
+   - Wrapper objects containing a records array: `{"records": [...]}` or `{"traffic": [...]}` or `{"data": [...]}`
+   - Single object record: `{ ... }`
+3. **JSON Lines (`.jsonl`, `.ndjson`)**: One JSON object per line.
+4. **Fallback Handling**: If a file with a `.json` extension contains line-delimited JSON, it falls back to NDJSON parsing automatically.
+
+### Limits & Safeguards
+- **Maximum Upload Size**: Configurable via `MAX_UPLOAD_SIZE_BYTES` (default: 50 MB / `52,428,800` bytes). Rejects oversized files with `FileTooLargeError`.
+- **Maximum Row Count**: Configurable via `MAX_INGESTION_ROWS` (default: `100,000` rows). Rejects unbounded files with `RowLimitExceededError`.
+- **Empty Files**: Files with 0 bytes or whitespace only raise `EmptyFileError`.
+- **Malformed Files**: Corrupt CSV/JSON syntax raises `FileParsingError`.
+- **Line Tracking**: Returns original row numbers (CSV header = line 1, data starts on line 2; JSON = line 1..N).
+
+---
+
 ## Getting Started
 
 ### 1. Prerequisites

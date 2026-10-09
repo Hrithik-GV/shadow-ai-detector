@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    # Ingestion & Upload Limits
+    MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
+    MAX_INGESTION_ROWS: int = 100_000  # 100,000 records
+
     # CORS Origins
     BACKEND_CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
