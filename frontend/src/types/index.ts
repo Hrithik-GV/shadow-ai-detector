@@ -19,16 +19,59 @@ export interface ApiStatusResponse {
   uptime?: number;
 }
 
+export interface DashboardActivityPoint {
+  timestamp: string;
+  count?: number;
+  trafficCount?: number;
+  aiFlowsCount?: number;
+}
+
+export interface ProviderDistributionItem {
+  provider: string;
+  count: number;
+  percentage?: number;
+}
+
+export interface RecentlyObservedEndpoint {
+  id?: string;
+  endpoint: string;
+  provider?: string;
+  observedAt?: string;
+  riskLevel?: RiskLevel;
+  isApproved?: boolean;
+}
+
 /**
  * Dashboard summary statistics (GET /api/dashboard/stats)
  */
 export interface DashboardStats {
-  totalTrafficEvents: number;
-  totalAiEndpoints: number;
-  unapprovedEndpointsCount: number;
-  flaggedRiskCount: number;
-  activeProvidersCount: number;
+  totalTrafficEvents?: number;
+  totalAnalyzedRecords?: number;
+  totalTrafficRecords?: number;
+  aiRelatedRecords?: number;
+  aiTrafficEvents?: number;
+  aiFlowsCount?: number;
+  totalAiEndpoints?: number;
+  totalEndpoints?: number;
+  activeProvidersCount?: number;
+  totalProviders?: number;
+  unapprovedEndpointsCount?: number;
+  flaggedRiskCount?: number;
+  highRiskCount?: number;
+  mediumRiskCount?: number;
+  lowRiskCount?: number;
+  criticalRiskCount?: number;
+  riskBreakdown?: {
+    critical?: number;
+    high?: number;
+    medium?: number;
+    low?: number;
+  };
+  activityOverTime?: DashboardActivityPoint[];
+  providerDistribution?: ProviderDistributionItem[] | Record<string, number>;
+  recentlyObservedEndpoints?: RecentlyObservedEndpoint[];
   lastAnalysisTimestamp?: string;
+  updatedAt?: string;
 }
 
 /**
