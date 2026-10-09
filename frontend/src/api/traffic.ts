@@ -3,10 +3,13 @@ import type { TrafficAnalysisResult, TrafficAnalyzeSubmitResponse } from '../typ
 
 /**
  * Proposed Route: POST /api/traffic/analyze
- * Submits a network traffic capture file (e.g., PCAP, JSON log) for AI telemetry analysis.
+ * Submits a network traffic capture file (CSV or JSON) for AI telemetry analysis.
  * Uses multipart/form-data as agreed in the API contract.
  */
-export async function submitTrafficAnalysis(file: File): Promise<TrafficAnalyzeSubmitResponse> {
+export async function submitTrafficAnalysis(
+  file: File,
+  onUploadProgress?: (progress: number) => void
+): Promise<TrafficAnalyzeSubmitResponse> {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -18,6 +21,12 @@ export async function submitTrafficAnalysis(file: File): Promise<TrafficAnalyzeS
         'Content-Type': 'multipart/form-data',
       },
       timeout: 60000, // Extended timeout for file upload & processing
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && onUploadProgress) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onUploadProgress(percent);
+        }
+      },
     }
   );
 

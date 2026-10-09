@@ -35,17 +35,24 @@ export interface DashboardStats {
  * Individual traffic record resulting from analysis
  */
 export interface TrafficRecord {
-  id: string;
-  timestamp: string;
-  sourceIp: string;
-  destinationIp: string;
-  destinationHost: string;
-  port: number;
-  protocol: string;
+  id?: string;
+  timestamp?: string;
+  sourceIp?: string;
+  destinationIp?: string;
+  destinationHost?: string;
+  destinationDomain?: string;
+  destinationPort?: number;
+  port?: number;
+  protocol?: string;
+  bytesSent?: number;
+  bytesReceived?: number;
+  bytesTransferred?: number;
+  classification?: string;
+  riskLevel?: RiskLevel;
+  detectionEvidence?: string | string[];
+  evidence?: string | string[];
   provider?: string;
   modelDetected?: string;
-  bytesTransferred?: number;
-  riskLevel: RiskLevel;
   flags?: string[];
 }
 
@@ -53,11 +60,13 @@ export interface TrafficRecord {
  * Traffic analysis summary
  */
 export interface TrafficAnalysisSummary {
-  totalPackets: number;
-  aiFlowsDetected: number;
-  uniqueProviders: number;
-  highRiskFlows: number;
+  totalPackets?: number;
+  totalRecords?: number;
+  aiFlowsDetected?: number;
+  uniqueProviders?: number;
+  highRiskFlows?: number;
   detectedProtocols?: string[];
+  analyzedAt?: string;
 }
 
 /**
@@ -66,10 +75,12 @@ export interface TrafficAnalysisSummary {
 export interface TrafficAnalysisResult {
   analysisId: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
-  createdAt: string;
+  createdAt?: string;
   completedAt?: string;
-  summary: TrafficAnalysisSummary;
-  records: TrafficRecord[];
+  timestamp?: string;
+  summary?: TrafficAnalysisSummary;
+  records?: TrafficRecord[];
+  totalRecords?: number;
   errorMessage?: string;
 }
 
