@@ -103,13 +103,13 @@ async def analyze_traffic(
         logger.error(f"Database runtime error: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error during processing: {str(exc)}",
+            detail="Database error occurred during processing. The transaction was rolled back.",
         )
     except Exception as exc:
         logger.exception(f"Unexpected error processing traffic file: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected error during traffic analysis: {str(exc)}",
+            detail="An unexpected error occurred during traffic analysis.",
         )
 
 

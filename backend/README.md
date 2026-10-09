@@ -12,8 +12,10 @@ The backend is structured according to modular FastAPI production conventions wi
 shadow-ai-detector/
 ├── docker-compose.yml           # Multi-container orchestration (PostgreSQL + FastAPI)
 ├── .gitignore                   # Repository git exclusions
+├── docs/
+│   └── traffic-api-contract.md  # Authoritative API Contract for Frontend Integration
 └── backend/
-    ├── Dockerfile               # Container build definition for backend
+    ├── Dockerfile               # Container build definition for backend (with HEALTHCHECK)
     ├── .dockerignore            # Container build exclusions
     ├── alembic.ini              # Alembic configuration
     ├── alembic/                 # Database migration scripts
@@ -30,7 +32,9 @@ shadow-ai-detector/
     │   │       ├── router.py    # Centralized v1 router
     │   │       └── endpoints/
     │   │           ├── __init__.py
-    │   │           └── health.py # Health check endpoint with real DB verification
+    │   │           ├── health.py     # Health check endpoint with real DB verification
+    │   │           ├── traffic.py    # Traffic upload, retrieval & pagination endpoints
+    │   │           └── dashboard.py  # Overview stats and aggregation endpoints
     │   ├── core/                # Core configuration and logging
     │   │   ├── __init__.py
     │   │   ├── config.py        # Pydantic Settings management (env vars)
@@ -44,15 +48,26 @@ shadow-ai-detector/
     │   │   └── traffic.py       # TrafficAnalysis & TrafficRecord models
     │   ├── schemas/             # Pydantic validation schemas
     │   │   ├── __init__.py
-    │   │   └── health.py        # Health response schemas
-    │   └── services/            # Business logic services (upcoming phases)
-    │       └── __init__.py
-    ├── tests/                   # Automated test suite
+    │   │   ├── health.py        # Health response schemas
+    │   │   ├── traffic.py       # Record validation and normalization schemas
+    │   │   └── traffic_api.py   # Traffic analysis & dashboard response schemas
+    │   └── services/            # Business logic and persistence services
+    │       ├── __init__.py
+    │       ├── ingestion.py                # CSV/JSON file stream ingestion service
+    │       ├── traffic_analysis_service.py # Persistence and transaction handling
+    │       ├── traffic_summary_service.py  # Real SQL aggregation and metrics service
+    │       └── exceptions.py               # Ingestion domain exceptions
+    ├── tests/                   # Automated test suite (67 tests)
     │   ├── __init__.py
-    │   ├── conftest.py          # TestClient and isolated DB session fixtures
-    │   ├── test_health.py       # Health check and root endpoint tests
-    │   ├── test_models.py       # Model instantiation and default value tests
-    │   └── test_db_operations.py # Isolated DB CRUD, cascade and relationship tests
+    │   ├── conftest.py               # TestClient and isolated DB session fixtures
+    │   ├── test_health.py            # Health check and root endpoint tests
+    │   ├── test_models.py            # Model instantiation and default value tests
+    │   ├── test_db_operations.py     # Isolated DB CRUD, cascade and relationship tests
+    │   ├── test_traffic_schemas.py   # Schema validation and alias tests
+    │   ├── test_ingestion.py         # File ingestion and parsing tests
+    │   ├── test_traffic_routes.py    # Endpoint integration tests
+    │   ├── test_traffic_summary.py   # Dedicated summary service & stats tests
+    │   └── test_end_to_end_flow.py   # Complete lifecycle flow integration tests
     ├── .env.example             # Example environment variables
     ├── requirements.txt         # Production and development dependencies
     └── README.md                # Documentation and run instructions
@@ -603,17 +618,37 @@ Accessible endpoints:
 
 ### 7. Running Tests
 
-The test suite includes:
-- **Unit Tests**: Model instantiation, field types, enums, representations.
-- **Health Verification**: Endpoints under both configured and unconfigured states.
-- **Isolated DB Operations**: CRUD, relationships, cascade deletes, and sparse/nullable field tests run inside an isolated transaction rollback on PostgreSQL to prevent database pollution.
+The test suite includes 67 automated tests covering:
+- **Unit & Model Tests**: Model instantiation, field types, enums, representations (`test_models.py`).
+- **Health Verification**: Real-time component availability under configured and unconfigured states (`test_health.py`).
+- **Schema Validation**: Header aliases, IPv4/IPv6, byte non-negativity, timestamps, and redaction (`test_traffic_schemas.py`).
+- **Ingestion Engine**: CSV, JSON array, JSON Lines, BOM stripping, row and size limits (`test_ingestion.py`).
+- **Database Operations**: CRUD, relationships, cascade deletes, sparse/nullable fields with isolated transaction rollbacks (`test_db_operations.py`).
+- **Traffic Routes**: Multipart upload, pagination, 400/404/413/500 error mapping (`test_traffic_routes.py`).
+- **Summary Statistics**: Empty datasets, repeated IPs, byte sums over available values, protocol distributions (`test_traffic_summary.py`).
+- **End-to-End Lifecycle**: Complete upload -> persist -> retrieve -> paginated flow for CSV and JSON (`test_end_to_end_flow.py`).
 
 Run all tests:
 
 ```bash
-$env:PYTHONPATH="backend"
+# From workspace root
+python -m pytest backend/tests -v
+
+# Or from backend directory
 pytest -v
 ```
+
+---
+
+## API Contract Reference
+
+For the comprehensive frontend integration specification, see [docs/traffic-api-contract.md](../docs/traffic-api-contract.md). It details:
+- Exact parameter names and multipart field definitions (`file`)
+- Supported file formats and header aliases
+- Complete JSON request and response payloads
+- Field requirements and nullability guarantees
+- Error response schemas and status codes
+
 
 ---
 
