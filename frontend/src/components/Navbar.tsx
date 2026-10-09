@@ -1,23 +1,54 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { StatusBadge } from './StatusBadge';
-import { ShieldCheck } from 'lucide-react';
+import { Menu, Shield } from 'lucide-react';
 
-export const Navbar: React.FC = () => {
+export interface NavbarProps {
+  onOpenMobile: () => void;
+}
+
+const routeTitles: Record<string, { title: string; breadcrumb: string }> = {
+  '/': { title: 'Overview', breadcrumb: 'CONSOLE > OVERVIEW' },
+  '/traffic': { title: 'Traffic Analysis', breadcrumb: 'CONSOLE > TRAFFIC ANALYSIS' },
+  '/inventory': { title: 'AI Inventory', breadcrumb: 'CONSOLE > AI INVENTORY' },
+  '/risks': { title: 'Risk Findings', breadcrumb: 'CONSOLE > RISK FINDINGS' },
+  '/reports': { title: 'Test Reports', breadcrumb: 'CONSOLE > TEST REPORTS' },
+  '/settings': { title: 'Settings', breadcrumb: 'CONSOLE > SETTINGS' },
+};
+
+export const Navbar: React.FC<NavbarProps> = ({ onOpenMobile }) => {
+  const location = useLocation();
+  const currentRoute = routeTitles[location.pathname] || {
+    title: 'Console',
+    breadcrumb: 'CONSOLE',
+  };
+
   return (
-    <header className="h-16 bg-slate-950/80 backdrop-blur border-b border-slate-800 px-6 flex items-center justify-between sticky top-0 z-20">
-      <div className="flex items-center space-x-3">
-        <span className="text-xs font-mono uppercase tracking-wider text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded">
-          Enterprise Security
-        </span>
-        <span className="text-slate-400 text-sm hidden sm:inline">|</span>
-        <span className="text-xs text-slate-400 hidden sm:inline">Network AI Ingestion & Classification Console</span>
+    <header className="h-16 bg-[#121212] border-b-2 border-[#333330] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
+      {/* Left: Mobile hamburger & Breadcrumbs / Page Title */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onOpenMobile}
+          className="md:hidden p-2 bg-[#181818] border border-[#333330] text-[#F4F4F0] hover:border-[#FFCC00] focus:outline-none"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-4 h-4 text-[#FFCC00]" />
+        </button>
+
+        <div>
+          <div className="font-mono text-[10px] text-[#9A9A91] tracking-widest uppercase flex items-center gap-1.5">
+            <Shield className="w-3 h-3 text-[#FFCC00]" />
+            <span>{currentRoute.breadcrumb}</span>
+          </div>
+          <h2 className="font-mono text-sm sm:text-base font-bold text-[#F4F4F0] tracking-wide uppercase">
+            {currentRoute.title}
+          </h2>
+        </div>
       </div>
 
-      <div className="flex items-center space-x-4">
+      {/* Right: API status badge */}
+      <div className="flex items-center gap-3">
         <StatusBadge />
-        <div className="p-2 text-slate-400 hover:text-slate-200" title="Security policy active">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-        </div>
       </div>
     </header>
   );

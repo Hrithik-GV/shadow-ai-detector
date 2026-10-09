@@ -1,24 +1,31 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { PageContainer } from '../components/common/PageContainer';
+import { EmptyState } from '../components/common/EmptyState';
+import { Button } from '../components/common/Button';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 export const NotFoundPage: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="p-3 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full mb-4">
-        <ShieldAlert className="w-8 h-8" />
-      </div>
-      <h1 className="text-2xl font-bold text-slate-100">404 - Page Not Found</h1>
-      <p className="mt-2 text-sm text-slate-400 max-w-md">
-        The requested security console route does not exist.
-      </p>
-      <Link
-        to="/"
-        className="mt-6 inline-flex items-center space-x-2 text-xs font-semibold px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" />
-        <span>Return to Overview</span>
-      </Link>
-    </div>
+    <PageContainer title="404 - Not Found" description="The requested route does not exist.">
+      <EmptyState
+        title="Page Not Found"
+        description="The navigation route you accessed is not recognized by the security console."
+        statusLabel="ERROR 404"
+        icon={<ShieldAlert className="w-7 h-7 text-[#FF6B6B]" />}
+        action={
+          <Button
+            variant="primary"
+            size="md"
+            icon={<ArrowLeft className="w-3.5 h-3.5" />}
+            onClick={() => navigate('/')}
+          >
+            RETURN TO OVERVIEW
+          </Button>
+        }
+      />
+    </PageContainer>
   );
 };
