@@ -38,6 +38,55 @@ describe('ReportsPage', () => {
     expect(screen.getByText(/2026-10-09 18:00:00 UTC/)).toBeInTheDocument();
   });
 
+  it('displays confusion matrix counts and versioned benchmark dataset info', async () => {
+    vi.mocked(reportsApi.getReportMetrics).mockResolvedValueOnce({
+      precision: 1.0,
+      recall: 1.0,
+      falsePositiveRate: 0.0,
+      providerAccuracy: 1.0,
+      datasetSize: 20,
+      truePositives: 10,
+      falsePositives: 0,
+      trueNegatives: 10,
+      falseNegatives: 0,
+      datasetVersion: '1.0.0',
+      evaluationDatasetName: 'shadow_ai_ground_truth_benchmark_v1',
+      evaluatedAt: '2026-10-10 00:00:00 UTC',
+    });
+
+    renderWithClient(<ReportsPage retry={false} />);
+
+    expect(await screen.findByText('Ground-Truth Confusion Matrix')).toBeInTheDocument();
+    expect(screen.getByText('True Positives (TP)')).toBeInTheDocument();
+    expect(screen.getByText('False Positives (FP)')).toBeInTheDocument();
+    expect(screen.getByText('True Negatives (TN)')).toBeInTheDocument();
+    expect(screen.getByText('False Negatives (FN)')).toBeInTheDocument();
+    expect(screen.getByText('VERSION 1.0.0')).toBeInTheDocument();
+    expect(screen.getByText(/shadow_ai_ground_truth_benchmark_v1/)).toBeInTheDocument();
+  });
+
+  it('handles null metrics for zero denominator cases gracefully without crashing', async () => {
+    vi.mocked(reportsApi.getReportMetrics).mockResolvedValueOnce({
+      precision: null,
+      recall: null,
+      falsePositiveRate: null,
+      providerAccuracy: null,
+      datasetSize: 0,
+      truePositives: 0,
+      falsePositives: 0,
+      trueNegatives: 0,
+      falseNegatives: 0,
+      datasetVersion: '1.0.0',
+      evaluatedAt: '2026-10-10 00:00:00 UTC',
+    });
+
+    renderWithClient(<ReportsPage retry={false} />);
+
+    expect(await screen.findByText('Ground-Truth Benchmark Summary')).toBeInTheDocument();
+    expect(screen.getAllByText('Not available').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/0 records/)).toBeInTheDocument();
+  });
+
   it('displays "No evaluation results available." when evaluation has not been run', async () => {
     vi.mocked(reportsApi.getReportMetrics).mockResolvedValueOnce({});
 

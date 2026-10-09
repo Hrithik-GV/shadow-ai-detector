@@ -287,15 +287,24 @@ export interface TestEvaluationMetrics {
   totalEvaluations?: number;
   datasetSize?: number;
   evaluatedRecordsCount?: number;
-  precision?: number;
-  detectionPrecision?: number;
-  recall?: number;
-  detectionRecall?: number;
-  falsePositiveRate?: number;
-  fpr?: number;
-  providerAccuracy?: number;
-  providerIdentificationAccuracy?: number;
-  detectionAccuracy?: number;
+  precision?: number | null;
+  detectionPrecision?: number | null;
+  recall?: number | null;
+  detectionRecall?: number | null;
+  falsePositiveRate?: number | null;
+  fpr?: number | null;
+  providerAccuracy?: number | null;
+  providerIdentificationAccuracy?: number | null;
+  detectionAccuracy?: number | null;
+  truePositives?: number;
+  falsePositives?: number;
+  trueNegatives?: number;
+  falseNegatives?: number;
+  datasetVersion?: string;
+  evaluationDatasetName?: string;
+  isIllustrative?: boolean;
+  notes?: string;
+  status?: string;
   averageLatencyMs?: number;
   analyzedDataVolumeMb?: number;
   timestamp?: string;
@@ -303,3 +312,4 @@ export interface TestEvaluationMetrics {
   lastGeneratedAt?: string;
   categoriesBreakdown?: Record<string, number>;
 }
+

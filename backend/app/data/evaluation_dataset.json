@@ -1,0 +1,188 @@
+{
+  "version": "1.0.0",
+  "dataset_name": "shadow_ai_ground_truth_benchmark_v1",
+  "description": "Curated ground-truth benchmark dataset for evaluating Shadow AI network domain detection, classification accuracy, and provider identification.",
+  "created_at": "2026-10-10T00:00:00Z",
+  "records": [
+    {
+      "id": "eval-001",
+      "domain": "api.openai.com",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "OpenAI",
+      "ground_truth_category": "LLM API / Foundation Models",
+      "traffic_type": "ai_api",
+      "notes": "Official OpenAI developer API endpoint"
+    },
+    {
+      "id": "eval-002",
+      "domain": "chatgpt.com",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "OpenAI",
+      "ground_truth_category": "Generative AI Web Interface",
+      "traffic_type": "ai_web",
+      "notes": "ChatGPT consumer web application"
+    },
+    {
+      "id": "eval-003",
+      "domain": "api.anthropic.com",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "Anthropic",
+      "ground_truth_category": "LLM API / Foundation Models",
+      "traffic_type": "ai_api",
+      "notes": "Claude developer API endpoint"
+    },
+    {
+      "id": "eval-004",
+      "domain": "claude.ai",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "Anthropic",
+      "ground_truth_category": "Generative AI Web Interface",
+      "traffic_type": "ai_web",
+      "notes": "Claude consumer web interface"
+    },
+    {
+      "id": "eval-005",
+      "domain": "generativelanguage.googleapis.com",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "Google",
+      "ground_truth_category": "LLM API / Foundation Models",
+      "traffic_type": "ai_api",
+      "notes": "Google Gemini API endpoint"
+    },
+    {
+      "id": "eval-006",
+      "domain": "copilot.microsoft.com",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "Microsoft",
+      "ground_truth_category": "Generative AI Assistant",
+      "traffic_type": "ai_assistant",
+      "notes": "Microsoft Copilot web endpoint"
+    },
+    {
+      "id": "eval-007",
+      "domain": "api.mistral.ai",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "Mistral",
+      "ground_truth_category": "LLM API / Foundation Models",
+      "traffic_type": "ai_api",
+      "notes": "Mistral AI platform API"
+    },
+    {
+      "id": "eval-008",
+      "domain": "api.perplexity.ai",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "Perplexity",
+      "ground_truth_category": "AI Search Engine",
+      "traffic_type": "ai_api",
+      "notes": "Perplexity API endpoint"
+    },
+    {
+      "id": "eval-009",
+      "domain": "api.cohere.com",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "Cohere",
+      "ground_truth_category": "Enterprise AI & Embeddings",
+      "traffic_type": "ai_api",
+      "notes": "Cohere enterprise API endpoint"
+    },
+    {
+      "id": "eval-010",
+      "domain": "api-inference.huggingface.co",
+      "ground_truth_is_ai": true,
+      "ground_truth_provider": "HuggingFace",
+      "ground_truth_category": "Model Repository / Open Weights",
+      "traffic_type": "ai_inference",
+      "notes": "Hugging Face Inference API"
+    },
+    {
+      "id": "eval-011",
+      "domain": "example.com",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "General Web",
+      "traffic_type": "benign",
+      "notes": "RFC 2606 reserved documentation domain"
+    },
+    {
+      "id": "eval-012",
+      "domain": "google.com",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "Search & Web Portal",
+      "traffic_type": "benign",
+      "notes": "Multi-purpose portal domain, not an AI-specific endpoint"
+    },
+    {
+      "id": "eval-013",
+      "domain": "microsoft.com",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "Corporate Portal",
+      "traffic_type": "benign",
+      "notes": "General corporate web domain, non-AI"
+    },
+    {
+      "id": "eval-014",
+      "domain": "github.com",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "Version Control & Dev",
+      "traffic_type": "benign",
+      "notes": "Developer repository hosting"
+    },
+    {
+      "id": "eval-015",
+      "domain": "cloudflare.com",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "CDN & Security",
+      "traffic_type": "benign",
+      "notes": "Content delivery network infrastructure"
+    },
+    {
+      "id": "eval-016",
+      "domain": "aws.amazon.com",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "Cloud Infrastructure",
+      "traffic_type": "benign",
+      "notes": "General cloud provider management console"
+    },
+    {
+      "id": "eval-017",
+      "domain": "wikipedia.org",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "Reference / Encyclopedia",
+      "traffic_type": "benign",
+      "notes": "Public knowledge base"
+    },
+    {
+      "id": "eval-018",
+      "domain": "unverified-ai-test.invalid",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "Uncertain / Synthetic",
+      "traffic_type": "uncertain",
+      "notes": "Synthetic ambiguous test domain - must be classified as uncertain/non-AI"
+    },
+    {
+      "id": "eval-019",
+      "domain": "internal-proxy.local",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "Internal Infrastructure",
+      "traffic_type": "benign",
+      "notes": "Internal network infrastructure"
+    },
+    {
+      "id": "eval-020",
+      "domain": "unknown-saas-app.io",
+      "ground_truth_is_ai": false,
+      "ground_truth_provider": null,
+      "ground_truth_category": "Unregistered SaaS",
+      "traffic_type": "benign",
+      "notes": "Third-party SaaS without AI signature"
+    }
+  ]
+}
