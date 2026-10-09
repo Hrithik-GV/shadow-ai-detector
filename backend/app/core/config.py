@@ -1,12 +1,20 @@
 import json
+import os
 from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT_DIR = os.path.dirname(_BACKEND_DIR)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            os.path.join(_ROOT_DIR, ".env"),
+            os.path.join(_BACKEND_DIR, ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
@@ -58,13 +66,15 @@ class Settings(BaseSettings):
     @property
     def sqlalchemy_database_uri(self) -> Optional[str]:
         if self.DATABASE_URL:
-            # Handle postgres:// legacy prefixes if provided
-            if self.DATABASE_URL.startswith("postgres://"):
-                return self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
-            return self.DATABASE_URL
+            url = self.DATABASE_URL
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+            elif url.startswith("postgresql://") and "+psycopg2" not in url:
+                url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            return url
         if self.POSTGRES_SERVER and self.POSTGRES_USER and self.POSTGRES_DB:
             password_part = f":{self.POSTGRES_PASSWORD}" if self.POSTGRES_PASSWORD else ""
-            return f"postgresql://{self.POSTGRES_USER}{password_part}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            return f"postgresql+psycopg2://{self.POSTGRES_USER}{password_part}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         return None
 
 

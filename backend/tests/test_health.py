@@ -55,3 +55,18 @@ def test_root_endpoint(client: TestClient):
     assert "Welcome" in data["message"]
     assert data["docs"] == "/docs"
     assert data["health"] == "/health"
+
+
+def test_database_reported_up_when_connected(client: TestClient):
+    """When a real PostgreSQL database is configured, verify health reports database up."""
+    import pytest
+    from tests.conftest import is_postgres_available
+    if not is_postgres_available():
+        pytest.skip("PostgreSQL is not configured or reachable")
+
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert data["components"]["database"]["status"] == "up"
+    assert "verified" in data["components"]["database"]["details"].lower()
