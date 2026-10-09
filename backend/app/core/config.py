@@ -43,6 +43,27 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000",
     ]
 
+    # AI Governance Policy Configuration
+    # Providers listed here are approved enterprise tools; all others are classified as unapproved Shadow AI
+    APPROVED_AI_PROVIDERS: Union[List[str], str] = [
+        "OpenAI",
+    ]
+
+    @field_validator("APPROVED_AI_PROVIDERS", mode="before")
+    @classmethod
+    def assemble_approved_providers(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            v_stripped = v.strip()
+            if v_stripped.startswith("[") and v_stripped.endswith("]"):
+                try:
+                    return json.loads(v_stripped)
+                except Exception:
+                    pass
+            return [i.strip() for i in v_stripped.split(",") if i.strip()]
+        elif isinstance(v, list):
+            return v
+        return ["OpenAI"]
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

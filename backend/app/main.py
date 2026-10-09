@@ -93,6 +93,16 @@ def create_application() -> FastAPI:
     from app.api.v1.endpoints.dashboard import router as dashboard_router
     application.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
 
+    # Mount unversioned /api/inventory, /api/risks, /api/reports endpoints for frontend integration
+    from app.api.v1.endpoints.inventory import router as inventory_router
+    application.include_router(inventory_router, prefix="/api/inventory", tags=["Inventory"])
+
+    from app.api.v1.endpoints.risks import router as risks_router
+    application.include_router(risks_router, prefix="/api/risks", tags=["Risks"])
+
+    from app.api.v1.endpoints.reports import router as reports_router
+    application.include_router(reports_router, prefix="/api/reports", tags=["Reports"])
+
     @application.get("/", tags=["Root"])
     def root():
         return {

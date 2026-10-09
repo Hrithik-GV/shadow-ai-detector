@@ -5,7 +5,12 @@ import uuid
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
-from app.models.traffic import TrafficAnalysis, TrafficRecord
+from app.models.traffic import (
+    TrafficAnalysis,
+    TrafficRecord,
+    AIEndpointInventoryModel,
+    RiskFindingModel,
+)
 from app.schemas.traffic_api import DashboardStatsResponse, TrafficMetricsSummary
 
 logger = logging.getLogger(__name__)
@@ -240,6 +245,43 @@ class TrafficSummaryService:
 
             distinct_protocols.sort()
 
+            # Query AI Endpoints and Risk Findings
+            inv_items = db.execute(select(AIEndpointInventoryModel)).scalars().all()
+            risk_findings = db.execute(select(RiskFindingModel)).scalars().all()
+
+            ai_records_count = sum(item.total_calls for item in inv_items)
+            total_ai_endpoints = len(inv_items)
+            distinct_providers = {item.provider for item in inv_items if item.provider}
+            unapproved_count = sum(1 for item in inv_items if not item.is_approved)
+
+            flagged_risk_count = len(risk_findings)
+            high_risk_count = sum(1 for f in risk_findings if f.risk_level == "high")
+            medium_risk_count = sum(1 for f in risk_findings if f.risk_level == "medium")
+            low_risk_count = sum(1 for f in risk_findings if f.risk_level == "low")
+            critical_risk_count = sum(1 for f in risk_findings if f.risk_level == "critical")
+
+            risk_breakdown = {
+                "critical": critical_risk_count,
+                "high": high_risk_count,
+                "medium": medium_risk_count,
+                "low": low_risk_count,
+            }
+
+            ai_provider_dist: Dict[str, int] = {}
+            for item in inv_items:
+                ai_provider_dist[item.provider] = ai_provider_dist.get(item.provider, 0) + item.total_calls
+
+            recent_endpoints = [
+                {
+                    "endpoint": item.domain,
+                    "provider": item.provider,
+                    "observedAt": item.last_seen_at.isoformat() if item.last_seen_at else None,
+                    "riskLevel": item.risk_level,
+                    "isApproved": item.is_approved,
+                }
+                for item in sorted(inv_items, key=lambda x: x.last_seen_at.timestamp() if x.last_seen_at else 0, reverse=True)[:5]
+            ]
+
             return DashboardStatsResponse(
                 scope="all_analyses",
                 analysis_id=None,
@@ -264,6 +306,18 @@ class TrafficSummaryService:
                 latest_timestamp=rec_row.latest_timestamp,
                 records_with_timestamp=records_with_ts,
                 missing_timestamp_count=missing_timestamp,
+                aiRelatedRecords=ai_records_count,
+                totalAiEndpoints=total_ai_endpoints,
+                activeProvidersCount=len(distinct_providers),
+                unapprovedEndpointsCount=unapproved_count,
+                flaggedRiskCount=flagged_risk_count,
+                highRiskCount=high_risk_count,
+                mediumRiskCount=medium_risk_count,
+                lowRiskCount=low_risk_count,
+                criticalRiskCount=critical_risk_count,
+                riskBreakdown=risk_breakdown,
+                providerDistribution=ai_provider_dist,
+                recentlyObservedEndpoints=recent_endpoints,
             )
         except Exception as exc:
             logger.warning(f"Error querying dashboard statistics from database: {exc}. Returning initial empty stats.")

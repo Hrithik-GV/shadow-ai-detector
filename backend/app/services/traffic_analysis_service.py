@@ -5,15 +5,21 @@ import uuid
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
-from app.models.traffic import AnalysisStatus, TrafficAnalysis, TrafficRecord
+from app.models.traffic import (
+    AnalysisStatus,
+    TrafficAnalysis,
+    TrafficRecord,
+    AIEndpointInventoryModel,
+    RiskFindingModel,
+)
 from app.schemas.traffic import RecordValidationError
 from app.schemas.traffic_api import TrafficMetricsSummary
 from app.services.ingestion import IngestionResult, TrafficIngestionService
+from app.services.ai_detector import default_detector
+from app.services.risk_engine import default_risk_engine, EndpointTrafficAggregate
+from app.services.traffic_summary_service import TrafficSummaryService
 
 logger = logging.getLogger(__name__)
-
-
-from app.services.traffic_summary_service import TrafficSummaryService
 
 
 def compute_analysis_metrics(db: Session, analysis_id: uuid.UUID) -> TrafficMetricsSummary:
@@ -52,6 +58,99 @@ def process_and_persist_traffic_file(
                 for record in ingestion_result.valid_records
             ]
             db.add_all(db_records)
+            db.flush()
+
+            # Step 3.5: Run AI Detection and Risk Assessment on valid records
+            endpoint_aggregates: Dict[str, EndpointTrafficAggregate] = {}
+            detector = default_detector
+            risk_engine = default_risk_engine
+
+            for rec in ingestion_result.valid_records:
+                target_host = rec.destination_domain or rec.sni_hostname
+                det = detector.classify_target(
+                    domain=rec.destination_domain,
+                    sni_hostname=rec.sni_hostname,
+                    destination_ip=rec.destination_ip,
+                    http_uri=rec.http_uri,
+                )
+
+                # Only confirmed AI detections are aggregated into AI inventory and risk engine!
+                # Unknown / uncertain domains (like unverified-ai-test.invalid) are NOT treated as AI
+                if det.is_ai and det.provider and target_host:
+                    if target_host not in endpoint_aggregates:
+                        endpoint_aggregates[target_host] = EndpointTrafficAggregate(
+                            target=target_host,
+                            provider=det.provider,
+                            category=det.category or "LLM API / Foundation Models",
+                            detection_signatures=list(det.detection_signatures),
+                        )
+
+                    agg = endpoint_aggregates[target_host]
+                    agg.total_calls += 1
+                    agg.bytes_sent += rec.bytes_sent or 0
+                    agg.bytes_received += rec.bytes_received or 0
+                    if rec.source_ip:
+                        agg.source_ips.append(rec.source_ip)
+                    if rec.timestamp:
+                        if agg.first_seen_at is None or rec.timestamp < agg.first_seen_at:
+                            agg.first_seen_at = rec.timestamp
+                        if agg.last_seen_at is None or rec.timestamp > agg.last_seen_at:
+                            agg.last_seen_at = rec.timestamp
+
+            # Evaluate each detected AI endpoint with the Risk Engine and persist
+            for target_host, agg in endpoint_aggregates.items():
+                inv_item, risk_finding = risk_engine.evaluate_endpoint(agg)
+
+                db_inv = AIEndpointInventoryModel(
+                    analysis_id=analysis.id,
+                    external_id=inv_item.id,
+                    provider=inv_item.provider,
+                    domain=inv_item.domain,
+                    hostname=inv_item.hostname,
+                    url=inv_item.url,
+                    endpoint_address=inv_item.endpoint_address,
+                    endpoint_type=inv_item.endpoint_type,
+                    category=inv_item.category,
+                    is_approved=inv_item.is_approved,
+                    approval_status=inv_item.approval_status,
+                    confidence=inv_item.confidence,
+                    total_calls=inv_item.total_calls,
+                    bytes_transferred=inv_item.bytes_transferred,
+                    data_transferred=inv_item.data_transferred,
+                    risk_level=inv_item.risk_level,
+                    risk_score=inv_item.risk_score,
+                    reasons=inv_item.reasons,
+                    evidence=inv_item.evidence,
+                    detection_signatures=inv_item.detection_signatures,
+                    first_seen_at=inv_item.first_seen_at,
+                    last_seen_at=inv_item.last_seen_at,
+                    investigation_status=inv_item.investigation_status,
+                )
+                db.add(db_inv)
+
+                if risk_finding:
+                    db_finding = RiskFindingModel(
+                        analysis_id=analysis.id,
+                        external_id=risk_finding.id,
+                        target=risk_finding.target,
+                        provider=risk_finding.provider,
+                        endpoint=risk_finding.endpoint,
+                        endpoint_hostname=risk_finding.endpoint_hostname,
+                        risk_score=risk_finding.risk_score,
+                        risk_level=risk_finding.risk_level,
+                        is_approved=risk_finding.is_approved,
+                        approval_status=risk_finding.approval_status,
+                        policy_rule=risk_finding.policy_rule,
+                        description=risk_finding.description,
+                        reasons=risk_finding.reasons,
+                        evidence=risk_finding.evidence,
+                        first_seen_at=risk_finding.first_seen_at,
+                        assessed_at=risk_finding.assessed_at,
+                        investigation_status=risk_finding.investigation_status,
+                        status=risk_finding.status,
+                    )
+                    db.add(db_finding)
+
             db.flush()
 
         # Step 4: Finalize analysis metadata

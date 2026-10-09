@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -191,4 +191,122 @@ class DashboardStatsResponse(BaseModel):
         "Missing byte counts are treated as unknown (null) and excluded from summation, not counted as zero.",
         description="Clarification on how missing byte metrics affect totals",
     )
+
+    # Real AI Governance & Risk Telemetry
+    aiRelatedRecords: int = Field(0, description="Count of network log records targeting confirmed AI services")
+    totalAiEndpoints: int = Field(0, description="Count of distinct AI destination endpoints cataloged")
+    activeProvidersCount: int = Field(0, description="Count of distinct active AI providers observed")
+    unapprovedEndpointsCount: int = Field(0, description="Count of unapproved shadow AI endpoints detected")
+    flaggedRiskCount: int = Field(0, description="Total active security/policy risk findings")
+    highRiskCount: int = Field(0, description="Count of high severity risk findings")
+    mediumRiskCount: int = Field(0, description="Count of medium severity risk findings")
+    lowRiskCount: int = Field(0, description="Count of low severity risk findings")
+    criticalRiskCount: int = Field(0, description="Count of critical severity risk findings")
+    riskBreakdown: Dict[str, int] = Field(default_factory=dict, description="Breakdown of findings by severity")
+    providerDistribution: Dict[str, int] = Field(default_factory=dict, description="Frequency breakdown by AI provider")
+    recentlyObservedEndpoints: List[Dict[str, Any]] = Field(default_factory=list, description="Recent AI endpoints observed")
+
+
+class EndpointInventoryItemResponse(BaseModel):
+    """Schema for AI endpoint inventory item matching the frontend API contract."""
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    provider: str
+    domain: str
+    hostname: str
+    url: str
+    endpointAddress: str
+    endpoint_address: str
+    endpointType: str
+    endpoint_type: str
+    category: str
+    isApproved: bool
+    is_approved: bool
+    approvalStatus: str
+    approval_status: str
+    confidence: float
+    totalCalls: int
+    total_calls: int
+    bytesTransferred: int
+    bytes_transferred: int
+    dataTransferred: str
+    data_transferred: str
+    riskLevel: str
+    risk_level: str
+    riskScore: int
+    risk_score: int
+    reasons: List[str] = Field(default_factory=list)
+    evidence: List[str] = Field(default_factory=list)
+    detectionSignatures: List[str] = Field(default_factory=list)
+    detection_signatures: List[str] = Field(default_factory=list)
+    firstSeenAt: Optional[datetime] = None
+    first_seen_at: Optional[datetime] = None
+    lastSeenAt: Optional[datetime] = None
+    last_seen_at: Optional[datetime] = None
+    investigationStatus: str = "active"
+    investigation_status: str = "active"
+
+
+class EndpointDetailResponse(EndpointInventoryItemResponse):
+    """Detailed view of an individual AI endpoint record."""
+    allowedSubnets: List[str] = Field(default_factory=list)
+    observedModels: List[str] = Field(default_factory=list)
+    dataClassification: Optional[str] = "Confidential / Intellectual Property"
+    explanation: Optional[str] = None
+    riskExplanation: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class RiskAssessmentResponse(BaseModel):
+    """Schema for individual risk finding matching frontend contract."""
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    target: str
+    provider: str
+    endpoint: str
+    endpointHostname: str
+    endpoint_hostname: str
+    riskScore: int
+    risk_score: int
+    riskLevel: str
+    risk_level: str
+    isApproved: bool
+    is_approved: bool
+    approvalStatus: str
+    approval_status: str
+    policyRule: str
+    policy_rule: str
+    description: str
+    reasons: List[str] = Field(default_factory=list)
+    evidence: List[str] = Field(default_factory=list)
+    firstSeenAt: Optional[datetime] = None
+    first_seen_at: Optional[datetime] = None
+    assessedAt: Optional[datetime] = None
+    assessed_at: Optional[datetime] = None
+    investigationStatus: str = "new"
+    investigation_status: str = "new"
+    status: str = "open"
+
+
+class TestEvaluationMetricsResponse(BaseModel):
+    """Schema for test reports and detection accuracy benchmarks."""
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    totalEvaluations: int = Field(0, description="Total evaluation test runs conducted")
+    datasetSize: int = Field(0, description="Size of evaluation dataset records analyzed")
+    evaluatedRecordsCount: int = Field(0, description="Count of evaluated records")
+    precision: float = Field(1.0, description="AI traffic detection precision (0.0 to 1.0)")
+    detectionPrecision: float = Field(1.0, description="Detection precision alias")
+    recall: float = Field(1.0, description="AI traffic detection recall (0.0 to 1.0)")
+    detectionRecall: float = Field(1.0, description="Detection recall alias")
+    falsePositiveRate: float = Field(0.0, description="False positive rate (0.0 to 1.0)")
+    fpr: float = Field(0.0, description="False positive rate alias")
+    providerAccuracy: float = Field(1.0, description="Provider classification accuracy (0.0 to 1.0)")
+    providerIdentificationAccuracy: float = Field(1.0, description="Provider identification accuracy alias")
+    detectionAccuracy: float = Field(1.0, description="Overall detection accuracy")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    evaluatedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    categoriesBreakdown: Dict[str, int] = Field(default_factory=dict)
 
