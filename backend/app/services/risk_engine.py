@@ -48,6 +48,7 @@ class EndpointTrafficAggregate:
     first_seen_at: Optional[datetime] = None
     last_seen_at: Optional[datetime] = None
     detection_signatures: List[str] = field(default_factory=list)
+    evidence_sources: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -169,6 +170,24 @@ class RiskEngine:
         if agg.source_ips:
             unique_sources = list(set(agg.source_ips))[:5]
             evidence.append(f"Originating Internal Host(s): {', '.join(unique_sources)}")
+
+        if agg.evidence_sources:
+            source_labels = {
+                "tls_sni": "TLS Server Name Indication (SNI) Handshake",
+                "dns_correlation": "DNS Resolution Correlation (A/AAAA record)",
+                "dns_query": "DNS Query Name Observation",
+                "csv_direct": "Direct CSV Log Entry",
+                "json_direct": "Direct JSON Log Entry",
+                "ip_only": "Direct Network IP Observation (No Hostname)",
+            }
+            labels = [source_labels.get(s, s) for s in agg.evidence_sources]
+            evidence.append(f"Evidence Provenance: {', '.join(labels)}")
+
+            if any(s in ("tls_sni", "dns_correlation", "dns_query", "ip_only") for s in agg.evidence_sources):
+                evidence.append(
+                    "Measurement Basis: Wire bytes observed at network layer (IP packet total length). "
+                    "Encrypted TLS payloads do not reveal prompt content or token counts."
+                )
 
         # 1. Organizational Policy Compliance Rule
         if not is_approved:

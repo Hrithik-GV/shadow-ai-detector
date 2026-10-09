@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     # Ingestion & Upload Limits
     MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
     MAX_INGESTION_ROWS: int = 100_000  # 100,000 records
+    MAX_PCAP_PACKETS: int = 50_000  # Maximum packets parsed per capture file
+    MAX_PCAP_PROCESSING_SECONDS: int = 30  # Safety timeout for PCAP analysis
 
     # CORS Origins (React Vite: 5173, CRA/Next: 3000, API: 8000)
     BACKEND_CORS_ORIGINS: Union[List[str], str] = [

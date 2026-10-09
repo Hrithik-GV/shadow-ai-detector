@@ -21,10 +21,11 @@ import {
   ShieldAlert,
   Loader2,
   Radio,
+  Info,
 } from 'lucide-react';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
-const ALLOWED_EXTENSIONS = ['.csv', '.json'];
+const ALLOWED_EXTENSIONS = ['.csv', '.json', '.jsonl', '.ndjson', '.pcap', '.pcapng', '.cap'];
 
 export const TrafficPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -64,7 +65,7 @@ export const TrafficPage: React.FC = () => {
     const hasValidExtension = ALLOWED_EXTENSIONS.some((ext) => fileName.endsWith(ext));
 
     if (!hasValidExtension) {
-      return 'Unsupported file format. Please upload a .csv or .json traffic file. (PCAP is supported only when explicitly enabled by backend).';
+      return 'Unsupported file format. Supported capture and log formats: .pcap, .pcapng, .cap, .csv, .json, .jsonl, .ndjson.';
     }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -235,8 +236,8 @@ export const TrafficPage: React.FC = () => {
       {!activeAnalysisId && (
         <Card
           variant="charcoal"
-          title="Traffic Capture File Ingestion"
-          subtitle="Submit traffic capture file for AI detection. Supports CSV and JSON formats up to 50 MB."
+          title="Traffic Capture & Log File Ingestion"
+          subtitle="Submit network captures (.pcap, .pcapng, .cap) or structured logs (.csv, .json) up to 50 MB for AI detection and risk assessment."
           headerIcon={<Upload className="w-5 h-5 text-[#FFCC00]" />}
         >
           <div className="space-y-4 font-mono text-xs">
@@ -244,7 +245,7 @@ export const TrafficPage: React.FC = () => {
               type="file"
               ref={fileInputRef}
               onChange={handleInputChange}
-              accept=".csv,.json"
+              accept=".csv,.json,.jsonl,.ndjson,.pcap,.pcapng,.cap"
               className="hidden"
             />
 
@@ -266,20 +267,39 @@ export const TrafficPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="font-bold text-[#F4F4F0] uppercase tracking-wide text-sm">
-                    {selectedFile ? selectedFile.name : 'DRAG & DROP TRAFFIC FILE HERE'}
+                    {selectedFile ? selectedFile.name : 'DRAG & DROP TRAFFIC OR CAPTURE FILE HERE'}
                   </p>
                   <p className="text-[#9A9A91] text-[11px] mt-1">
                     {selectedFile
                       ? `Size: ${(selectedFile.size / 1024).toFixed(1)} KB — Click or drop to change`
-                      : 'or click to browse local files (.CSV, .JSON)'}
+                      : 'or click to browse local files (.PCAP, .PCAPNG, .CSV, .JSON)'}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2 pt-1 flex-wrap justify-center">
+                  <Badge variant="accent" size="sm">PCAP</Badge>
+                  <Badge variant="accent" size="sm">PCAPNG</Badge>
                   <Badge variant="muted" size="sm">CSV</Badge>
                   <Badge variant="muted" size="sm">JSON</Badge>
                   <Badge variant="muted" size="sm">MAX 50MB</Badge>
                 </div>
               </div>
+            </div>
+
+            {/* Capture Capabilities & Scope Note */}
+            <div className="p-3 bg-[#171716] border border-[#2B2B28] text-[11px] text-[#9A9A91] space-y-1.5 leading-relaxed">
+              <div className="flex items-center gap-2 text-[#F4F4F0] font-bold uppercase tracking-wider text-[10px]">
+                <Info className="w-3.5 h-3.5 text-[#FFCC00]" />
+                <span>Capture Analysis Scope & Wire Byte Semantics</span>
+              </div>
+              <p>
+                <strong className="text-[#E0E0DC]">Supported Metadata:</strong> Timestamps, IP 5-tuples, transport protocols (TCP/UDP), DNS queries and A/AAAA resolutions, and TLS Server Name Indication (SNI) hostnames via RFC 6066.
+              </p>
+              <p>
+                <strong className="text-[#E0E0DC]">Security Boundary:</strong> Operates strictly on uploaded captures in userspace without requiring live sniffing privileges or TLS payload decryption. Plain IP flows without SNI or DNS evidence are never guessed.
+              </p>
+              <p>
+                <strong className="text-[#E0E0DC]">Byte Definitions:</strong> Measured bytes represent Layer 3 IP wire length. Network bytes do not reveal prompt contents or artificial token billing metrics.
+              </p>
             </div>
 
             {/* Client Validation Error State */}
@@ -409,45 +429,70 @@ export const TrafficPage: React.FC = () => {
           <Card
             variant="charcoal"
             title="Analysis Summary & Telemetry Metadata"
-            subtitle={`Analysis ID: ${analysisResult.analysisId} | Timestamp: ${
+            subtitle={`Analysis ID: ${analysisResult.analysisId} | File: ${
+              analysisResult.original_filename || 'capture'
+            } | Format: ${(analysisResult.file_format || 'auto').toUpperCase()} | Timestamp: ${
               analysisResult.completedAt || analysisResult.createdAt || analysisResult.timestamp || 'Not available'
             }`}
             headerIcon={<CheckCircle2 className="w-5 h-5 text-[#00E575]" />}
             action={
-              <Button variant="outline" size="sm" onClick={handleReset}>
-                ANALYZE ANOTHER FILE
-              </Button>
+              <div className="flex items-center gap-2">
+                <Badge variant="accent">
+                  {(analysisResult.file_format || 'traffic').toUpperCase()}
+                </Badge>
+                <Button variant="outline" size="sm" onClick={handleReset}>
+                  ANALYZE ANOTHER FILE
+                </Button>
+              </div>
             }
           >
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono text-xs">
-              <div className="bg-[#0D0D0D] p-3 border border-[#333330]">
-                <span className="text-[#9A9A91] text-[10px] uppercase block">Total Records / Packets</span>
-                <span className="text-lg font-bold text-[#F4F4F0]">
-                  {analysisResult.summary?.totalPackets ??
-                    analysisResult.summary?.totalRecords ??
-                    analysisResult.totalRecords ??
-                    analysisResult.records?.length ??
-                    'Not available'}
-                </span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono text-xs">
+                <div className="bg-[#0D0D0D] p-3 border border-[#333330]">
+                  <span className="text-[#9A9A91] text-[10px] uppercase block">Total Records / Packets</span>
+                  <span className="text-lg font-bold text-[#F4F4F0]">
+                    {analysisResult.summary?.totalPackets ??
+                      analysisResult.summary?.totalRecords ??
+                      analysisResult.total_rows_received ??
+                      analysisResult.totalRecords ??
+                      analysisResult.records?.length ??
+                      'Not available'}
+                  </span>
+                  {analysisResult.valid_rows !== undefined && (
+                    <span className="text-[10px] text-[#00E575] block mt-0.5">
+                      {analysisResult.valid_rows} valid flows parsed
+                    </span>
+                  )}
+                </div>
+                <div className="bg-[#0D0D0D] p-3 border border-[#333330]">
+                  <span className="text-[#9A9A91] text-[10px] uppercase block">AI Flows Detected</span>
+                  <span className="text-lg font-bold text-[#FFCC00]">
+                    {analysisResult.summary?.aiFlowsDetected ?? 'Not available'}
+                  </span>
+                </div>
+                <div className="bg-[#0D0D0D] p-3 border border-[#333330]">
+                  <span className="text-[#9A9A91] text-[10px] uppercase block">Unique Providers</span>
+                  <span className="text-lg font-bold text-[#F4F4F0]">
+                    {analysisResult.summary?.uniqueProviders ?? 'Not available'}
+                  </span>
+                </div>
+                <div className="bg-[#0D0D0D] p-3 border border-[#333330]">
+                  <span className="text-[#9A9A91] text-[10px] uppercase block">High-Risk Flows</span>
+                  <span className="text-lg font-bold text-[#FF6B6B]">
+                    {analysisResult.summary?.highRiskFlows ?? 'Not available'}
+                  </span>
+                </div>
               </div>
-              <div className="bg-[#0D0D0D] p-3 border border-[#333330]">
-                <span className="text-[#9A9A91] text-[10px] uppercase block">AI Flows Detected</span>
-                <span className="text-lg font-bold text-[#FFCC00]">
-                  {analysisResult.summary?.aiFlowsDetected ?? 'Not available'}
-                </span>
-              </div>
-              <div className="bg-[#0D0D0D] p-3 border border-[#333330]">
-                <span className="text-[#9A9A91] text-[10px] uppercase block">Unique Providers</span>
-                <span className="text-lg font-bold text-[#F4F4F0]">
-                  {analysisResult.summary?.uniqueProviders ?? 'Not available'}
-                </span>
-              </div>
-              <div className="bg-[#0D0D0D] p-3 border border-[#333330]">
-                <span className="text-[#9A9A91] text-[10px] uppercase block">High-Risk Flows</span>
-                <span className="text-lg font-bold text-[#FF6B6B]">
-                  {analysisResult.summary?.highRiskFlows ?? 'Not available'}
-                </span>
-              </div>
+
+              {/* Rejected / Truncated Packets Callout */}
+              {Boolean(analysisResult.rejected_rows && analysisResult.rejected_rows > 0) && (
+                <div className="p-3 bg-[#2A1C0A] border border-[#735C00] text-[#FFCC00] flex items-center gap-2.5 font-mono text-xs">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-[#FFCC00]" />
+                  <span>
+                    <strong>Capture Notice:</strong> {analysisResult.rejected_rows} packets or frames were rejected due to corruption, truncation, or malformed protocol headers. Valid traffic was processed safely.
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
 
@@ -650,6 +695,12 @@ export const TrafficPage: React.FC = () => {
                       NEXT
                     </Button>
                   </div>
+                </div>
+
+                {/* Measurement Semantics Footnote */}
+                <div className="px-4 py-2.5 bg-[#121212] border-t border-[#262624] text-[10px] text-[#7A7A72] flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-mono">
+                  <span>* Wire Byte Counts: Measured as total Layer 3 IP datagram length (IP/TCP headers + payload) on network interface.</span>
+                  <span>TLS confidentiality preserved; encrypted payloads do not reveal prompt contents or token costs.</span>
                 </div>
               </div>
             )}

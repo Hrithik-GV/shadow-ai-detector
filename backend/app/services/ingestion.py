@@ -28,6 +28,9 @@ SUPPORTED_EXTENSIONS = {
     ".json": "json",
     ".jsonl": "jsonl",
     ".ndjson": "jsonl",
+    ".pcap": "pcap",
+    ".cap": "pcap",
+    ".pcapng": "pcapng",
 }
 
 
@@ -41,6 +44,7 @@ class IngestionResult:
     rejected_count: int
     valid_records: List[NormalizedTrafficRecord] = field(default_factory=list)
     rejected_records: List[RecordValidationError] = field(default_factory=list)
+    capture_metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_successful(self) -> bool:
@@ -100,14 +104,17 @@ class TrafficIngestionService:
             FileParsingError: If file syntax is corrupt or cannot be parsed.
         """
         fmt = self._detect_format(filename)
-        raw_bytes, text = self._read_and_validate_size(content, filename)
+        is_binary = fmt in ("pcap", "pcapng")
+        raw_bytes, text = self._read_and_validate_size(content, filename, is_binary=is_binary)
 
         if fmt == "csv":
-            return self._ingest_csv(text, filename)
+            return self._ingest_csv(text or "", filename)
         elif fmt == "json":
-            return self._ingest_json(text, filename, is_jsonl=False)
+            return self._ingest_json(text or "", filename, is_jsonl=False)
         elif fmt == "jsonl":
-            return self._ingest_json(text, filename, is_jsonl=True)
+            return self._ingest_json(text or "", filename, is_jsonl=True)
+        elif fmt in ("pcap", "pcapng"):
+            return self._ingest_pcap(raw_bytes, filename, fmt)
         else:
             raise UnsupportedFileFormatError(
                 f"Unsupported format '{fmt}' for file '{filename}'"
@@ -121,12 +128,12 @@ class TrafficIngestionService:
         _, ext = os.path.splitext(filename.lower())
         if not ext:
             raise UnsupportedFileFormatError(
-                f"Filename '{filename}' is missing an extension. Supported extensions: .csv, .json, .jsonl, .ndjson"
+                f"Filename '{filename}' is missing an extension. Supported extensions: .csv, .json, .jsonl, .ndjson, .pcap, .pcapng, .cap"
             )
 
         if ext not in SUPPORTED_EXTENSIONS:
             raise UnsupportedFileFormatError(
-                f"Unsupported file extension '{ext}' for '{filename}'. Supported: .csv, .json, .jsonl, .ndjson"
+                f"Unsupported file extension '{ext}' for '{filename}'. Supported: .csv, .json, .jsonl, .ndjson, .pcap, .pcapng, .cap"
             )
 
         return SUPPORTED_EXTENSIONS[ext]
@@ -135,8 +142,9 @@ class TrafficIngestionService:
         self,
         content: Union[bytes, str, BinaryIO, TextIO],
         filename: str,
-    ) -> Tuple[bytes, str]:
-        """Reads content, verifies size constraints, and decodes to text."""
+        is_binary: bool = False,
+    ) -> Tuple[bytes, Optional[str]]:
+        """Reads content, verifies size constraints, and decodes to text if not binary."""
         # Extract raw bytes or text
         if hasattr(content, "read"):
             data = content.read()
@@ -145,11 +153,13 @@ class TrafficIngestionService:
                 raw_bytes = data.encode("utf-8")
             else:
                 raw_bytes = data
-                text = self._decode_bytes(raw_bytes, filename)
+                text = None if is_binary else self._decode_bytes(raw_bytes, filename)
         elif isinstance(content, bytes):
             raw_bytes = content
-            text = self._decode_bytes(raw_bytes, filename)
+            text = None if is_binary else self._decode_bytes(raw_bytes, filename)
         elif isinstance(content, str):
+            if is_binary:
+                raise FileParsingError(f"Binary capture file '{filename}' cannot be passed as unicode string")
             text = content
             raw_bytes = content.encode("utf-8")
         else:
@@ -158,7 +168,10 @@ class TrafficIngestionService:
             )
 
         # Check for empty content
-        if len(raw_bytes) == 0 or not text.strip():
+        if len(raw_bytes) == 0:
+            raise EmptyFileError(f"Uploaded file '{filename}' is empty")
+
+        if not is_binary and (text is None or not text.strip()):
             raise EmptyFileError(f"Uploaded file '{filename}' is empty")
 
         # Check maximum file size
@@ -168,6 +181,30 @@ class TrafficIngestionService:
             )
 
         return raw_bytes, text
+
+    def _ingest_pcap(self, raw_bytes: bytes, filename: str, fmt: str) -> IngestionResult:
+        """Parses network packets from binary PCAP/PCAPNG captures using Scapy."""
+        from app.services.pcap_service import PcapService
+
+        valid_records, rejected_records, capture_stats = PcapService.parse_capture(
+            raw_bytes=raw_bytes,
+            filename=filename,
+            file_format=fmt,
+            max_packets=settings.MAX_PCAP_PACKETS,
+            max_seconds=settings.MAX_PCAP_PROCESSING_SECONDS,
+        )
+
+        total_rows = len(valid_records) + len(rejected_records)
+        return IngestionResult(
+            filename=filename,
+            file_format=fmt,
+            total_rows=total_rows,
+            valid_count=len(valid_records),
+            rejected_count=len(rejected_records),
+            valid_records=valid_records,
+            rejected_records=rejected_records,
+            capture_metadata=capture_stats,
+        )
 
     def _decode_bytes(self, data: bytes, filename: str) -> str:
         """Decodes bytes using standard UTF-8/UTF-8-SIG or Latin-1 fallback."""
@@ -217,6 +254,8 @@ class TrafficIngestionService:
 
             res = validate_traffic_record(clean_row, row_index=line_no)
             if res.is_valid and res.record:
+                if not res.record.extra_metadata.get("evidence_source"):
+                    res.record.extra_metadata["evidence_source"] = "csv_direct"
                 valid_records.append(res.record)
             else:
                 sanitized = sanitize_record_for_logging(clean_row)
@@ -318,6 +357,8 @@ class TrafficIngestionService:
 
             res = validate_traffic_record(item, row_index=line_no)
             if res.is_valid and res.record:
+                if not res.record.extra_metadata.get("evidence_source"):
+                    res.record.extra_metadata["evidence_source"] = "json_direct"
                 valid_records.append(res.record)
             else:
                 sanitized = sanitize_record_for_logging(item)
@@ -391,6 +432,8 @@ class TrafficIngestionService:
 
             res = validate_traffic_record(item, row_index=line_no)
             if res.is_valid and res.record:
+                if not res.record.extra_metadata.get("evidence_source"):
+                    res.record.extra_metadata["evidence_source"] = "json_direct"
                 valid_records.append(res.record)
             else:
                 sanitized = sanitize_record_for_logging(item)

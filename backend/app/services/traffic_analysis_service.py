@@ -91,6 +91,10 @@ def process_and_persist_traffic_file(
                     agg.bytes_received += rec.bytes_received or 0
                     if rec.source_ip:
                         agg.source_ips.append(rec.source_ip)
+                    if rec.extra_metadata and "evidence_source" in rec.extra_metadata:
+                        src = rec.extra_metadata["evidence_source"]
+                        if src and src not in agg.evidence_sources:
+                            agg.evidence_sources.append(src)
                     if rec.timestamp:
                         if agg.first_seen_at is None or rec.timestamp < agg.first_seen_at:
                             agg.first_seen_at = rec.timestamp

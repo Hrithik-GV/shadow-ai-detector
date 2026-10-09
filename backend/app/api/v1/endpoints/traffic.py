@@ -47,15 +47,19 @@ router = APIRouter()
     "/analyze",
     response_model=TrafficAnalyzeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload and analyze a traffic capture file",
-    description="Ingests CSV or JSON traffic logs, validates rows, and persists valid records to PostgreSQL.",
+    summary="Upload and analyze a traffic capture or log file",
+    description=(
+        "Ingests network capture files (.pcap, .pcapng, .cap) and structured logs (.csv, .json, .jsonl, .ndjson). "
+        "Extracts IP 5-tuples, DNS queries/responses, and TLS SNI handshakes via Scapy userspace parsing, "
+        "validates rows, and persists valid records to PostgreSQL without decrypting payloads."
+    ),
 )
 async def analyze_traffic(
-    file: UploadFile = File(..., description="Traffic log file (.csv, .json, .jsonl, .ndjson)"),
+    file: UploadFile = File(..., description="Traffic capture or log file (.pcap, .pcapng, .cap, .csv, .json, .jsonl, .ndjson)"),
     db: Session = Depends(get_db),
 ) -> TrafficAnalyzeResponse:
-    """Upload a network capture file, process rows, and persist results."""
-    filename = file.filename or "unknown.csv"
+    """Upload a network capture or log file, process observations, and persist results."""
+    filename = file.filename or "unknown.pcap"
 
     try:
         content = await file.read()
