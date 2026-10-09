@@ -98,15 +98,35 @@ export interface TrafficAnalyzeSubmitResponse {
  */
 export interface EndpointInventoryItem {
   id: string;
-  provider: string;
-  domain: string;
-  url: string;
-  category: string;
-  isApproved: boolean;
-  riskLevel: RiskLevel;
-  firstSeenAt: string;
-  lastSeenAt: string;
+  provider?: string;
+  domain?: string;
+  hostname?: string;
+  url?: string;
+  endpointAddress?: string;
+  endpointType?: string;
+  type?: string;
+  category?: string;
+  isApproved?: boolean;
+  approvalStatus?: string;
+  status?: string;
+  confidence?: number;
+  detectionConfidence?: number;
   totalCalls?: number;
+  requestCount?: number;
+  connectionCount?: number;
+  observedRequests?: number;
+  dataTransferred?: number | string;
+  bytesTransferred?: number;
+  riskLevel?: RiskLevel;
+  riskScore?: number | string;
+  reasons?: string[];
+  riskReasons?: string[];
+  evidence?: string | string[];
+  detectionEvidence?: string | string[];
+  detectionSignatures?: string[];
+  firstSeenAt?: string;
+  lastSeenAt?: string;
+  investigationStatus?: string;
 }
 
 /**
@@ -117,6 +137,9 @@ export interface EndpointDetail extends EndpointInventoryItem {
   observedModels?: string[];
   dataClassification?: string;
   detectionSignatures?: string[];
+  evidence?: string | string[];
+  explanation?: string;
+  riskExplanation?: string;
   notes?: string;
 }
 
@@ -125,13 +148,22 @@ export interface EndpointDetail extends EndpointInventoryItem {
  */
 export interface RiskAssessment {
   id: string;
-  target: string;
-  riskLevel: RiskLevel;
-  policyRule: string;
-  description: string;
-  reasons: string[];
-  assessedAt: string;
-  status: 'active' | 'investigating' | 'resolved';
+  target?: string;
+  provider?: string;
+  endpoint?: string;
+  endpointHostname?: string;
+  riskScore?: number | string;
+  riskLevel?: RiskLevel;
+  isApproved?: boolean;
+  approvalStatus?: string;
+  policyRule?: string;
+  description?: string;
+  reasons?: string[];
+  evidence?: string | string[];
+  firstSeenAt?: string;
+  assessedAt?: string;
+  investigationStatus?: string;
+  status?: string;
 }
 
 /**
