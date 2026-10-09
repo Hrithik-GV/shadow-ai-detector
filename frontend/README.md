@@ -1,32 +1,74 @@
-# React + TypeScript + Vite
+# Shadow AI Detector - Frontend Console
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A cybersecurity web console built with **React**, **TypeScript**, **Vite**, **Tailwind CSS**, **TanStack Query**, and **Axios**, following the **Pixel Arcade Design System**.
 
-Currently, two official plugins are available:
+Shadow AI Detector empowers organizational security administrators to discover AI-related network traffic, catalog AI providers and endpoints, evaluate data egress risks, and monitor compliance.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 1. API Configuration
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The frontend communicates with the Shadow AI detection backend through a centralized Axios client.
 
-## Expanding the Oxlint configuration
+### Environment Variable
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+Configure the target backend URL in your `.env` file (copied from `.env.example`):
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+# Default local development server runs at http://localhost:8000
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+- If `VITE_API_BASE_URL` is omitted, the application automatically defaults to `http://localhost:8000`.
+- All requests are configured with a 15-second default timeout (extended to 60s for file uploads).
+- Network disconnections and server errors trigger consistent error handling without substituting mock or dummy data.
+
+---
+
+## 2. API Contract with Backend
+
+The following REST endpoints form the contract between the frontend and the backend detection service:
+
+| Method | Endpoint | Description | Request Format | Response Schema |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Backend availability probe (if implemented) | None | `{ status: string, version?: string, uptime?: number }` |
+| `POST` | `/api/traffic/analyze` | Submit traffic capture file for AI analysis | `multipart/form-data` (`file: File`) | `{ analysisId: string, status: string, message: string }` |
+| `GET` | `/api/traffic/{analysis_id}` | Retrieve results of traffic analysis job | None | `{ analysisId, status, summary, records: [...] }` |
+| `GET` | `/api/inventory` | Retrieve catalog of discovered AI endpoints | None | `EndpointInventoryItem[]` |
+| `GET` | `/api/inventory/{endpoint_id}` | Retrieve detailed endpoint metadata | None | `EndpointDetail` |
+| `GET` | `/api/dashboard/stats` | Retrieve summary operational counts | None | `DashboardStats` |
+| `GET` | `/api/reports/metrics` | Retrieve model evaluation metrics | None | `TestEvaluationMetrics` |
+| `GET` | `/api/risks` | Retrieve detected risk policy violations | None | `RiskAssessment[]` |
+
+### File Uploads (`/api/traffic/analyze`)
+Traffic captures (`.pcap`, `.pcapng`, `.json`, `.csv`, `.log`) are submitted as **`multipart/form-data`** containing the file payload. The frontend does not send raw JSON for file upload requests.
+
+---
+
+## 3. Data Integrity & Honest UI States
+
+- **Zero Mock Policy**: The application strictly avoids fabricated metrics, dummy charts, or synthetic endpoint records.
+- When an API endpoint is not yet reachable or implemented, the UI renders informative **Query Error States** with the exact error details and a **Retry** action.
+- When an API endpoint responds with empty datasets, the UI renders styled **Empty States** awaiting ingestion.
+- The top header features a live **API Status Indicator** showing `CONNECTED`, `CHECKING`, or `OFFLINE` with a direct retest action.
+
+---
+
+## 4. Development & Build Scripts
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Run TypeScript type check
+npm run typecheck
+
+# Run linter
+npm run lint
+
+# Build production bundle
+npm run build
+```

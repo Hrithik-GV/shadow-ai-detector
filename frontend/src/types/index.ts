@@ -1,26 +1,40 @@
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical' | 'unknown';
 
-export interface AIProvider {
-  id: string;
-  name: string;
-  domain: string;
-  category: string;
-  riskScore?: number;
-  riskLevel?: RiskLevel;
-  firstSeenAt?: string;
-  lastSeenAt?: string;
+/**
+ * Standardized API Error schema across all endpoints
+ */
+export interface ApiError {
+  message: string;
+  status?: number;
+  code?: string;
+  details?: unknown;
 }
 
-export interface AIEndpoint {
-  id: string;
-  providerId: string;
-  url: string;
-  protocol: string;
-  isApproved: boolean;
-  riskLevel: RiskLevel;
+/**
+ * Health check response (GET /health)
+ */
+export interface ApiStatusResponse {
+  status: string;
+  version?: string;
+  uptime?: number;
 }
 
-export interface NetworkTrafficEvent {
+/**
+ * Dashboard summary statistics (GET /api/dashboard/stats)
+ */
+export interface DashboardStats {
+  totalTrafficEvents: number;
+  totalAiEndpoints: number;
+  unapprovedEndpointsCount: number;
+  flaggedRiskCount: number;
+  activeProvidersCount: number;
+  lastAnalysisTimestamp?: string;
+}
+
+/**
+ * Individual traffic record resulting from analysis
+ */
+export interface TrafficRecord {
   id: string;
   timestamp: string;
   sourceIp: string;
@@ -28,23 +42,96 @@ export interface NetworkTrafficEvent {
   destinationHost: string;
   port: number;
   protocol: string;
-  providerId?: string;
-  bytesSent: number;
-  bytesReceived: number;
+  provider?: string;
+  modelDetected?: string;
+  bytesTransferred?: number;
   riskLevel: RiskLevel;
+  flags?: string[];
 }
 
-export interface RiskClassification {
+/**
+ * Traffic analysis summary
+ */
+export interface TrafficAnalysisSummary {
+  totalPackets: number;
+  aiFlowsDetected: number;
+  uniqueProviders: number;
+  highRiskFlows: number;
+  detectedProtocols?: string[];
+}
+
+/**
+ * Full traffic analysis result (GET /api/traffic/{analysis_id})
+ */
+export interface TrafficAnalysisResult {
+  analysisId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  createdAt: string;
+  completedAt?: string;
+  summary: TrafficAnalysisSummary;
+  records: TrafficRecord[];
+  errorMessage?: string;
+}
+
+/**
+ * Traffic analysis submission response (POST /api/traffic/analyze)
+ */
+export interface TrafficAnalyzeSubmitResponse {
+  analysisId: string;
+  status: 'pending' | 'processing' | 'completed';
+  message: string;
+}
+
+/**
+ * AI Endpoint Inventory Item (GET /api/inventory)
+ */
+export interface EndpointInventoryItem {
+  id: string;
+  provider: string;
+  domain: string;
+  url: string;
+  category: string;
+  isApproved: boolean;
+  riskLevel: RiskLevel;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  totalCalls?: number;
+}
+
+/**
+ * Detailed Endpoint Record (GET /api/inventory/{endpoint_id})
+ */
+export interface EndpointDetail extends EndpointInventoryItem {
+  allowedSubnets?: string[];
+  observedModels?: string[];
+  dataClassification?: string;
+  detectionSignatures?: string[];
+  notes?: string;
+}
+
+/**
+ * Risk Assessment Finding
+ */
+export interface RiskAssessment {
   id: string;
   target: string;
   riskLevel: RiskLevel;
+  policyRule: string;
+  description: string;
   reasons: string[];
   assessedAt: string;
-  status: 'active' | 'resolved' | 'investigating';
+  status: 'active' | 'investigating' | 'resolved';
 }
 
-export interface ApiStatusResponse {
-  status: string;
-  version?: string;
-  uptime?: number;
+/**
+ * Test & evaluation metrics report (GET /api/reports/metrics)
+ */
+export interface TestEvaluationMetrics {
+  totalEvaluations: number;
+  detectionAccuracy?: number;
+  falsePositiveRate?: number;
+  averageLatencyMs?: number;
+  analyzedDataVolumeMb?: number;
+  lastGeneratedAt?: string;
+  categoriesBreakdown?: Record<string, number>;
 }

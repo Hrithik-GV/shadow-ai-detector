@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
-import type { ApiStatusResponse } from '../types';
+import { checkBackendHealth } from '../api/health';
+import type { ApiStatusResponse, ApiError } from '../types';
+
+export const HEALTH_QUERY_KEY = ['backendHealth'] as const;
 
 export function useApiHealth() {
-  return useQuery<ApiStatusResponse>({
-    queryKey: ['apiHealth'],
-    queryFn: async () => {
-      const response = await apiClient.get<ApiStatusResponse>('/health');
-      return response.data;
-    },
+  return useQuery<ApiStatusResponse, ApiError>({
+    queryKey: HEALTH_QUERY_KEY,
+    queryFn: checkBackendHealth,
     retry: 1,
-    staleTime: 30000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
 }
