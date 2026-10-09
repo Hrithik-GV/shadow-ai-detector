@@ -126,8 +126,9 @@ export const TrafficPage: React.FC = () => {
       },
       {
         onSuccess: (response) => {
-          if (response.analysisId) {
-            setActiveAnalysisId(response.analysisId);
+          const id = response.id || response.analysisId;
+          if (id) {
+            setActiveAnalysisId(id);
             setCurrentPage(1);
           }
         },
@@ -153,19 +154,29 @@ export const TrafficPage: React.FC = () => {
   const filteredRecords = useMemo(() => {
     const records = analysisResult?.records || [];
     return records.filter((rec) => {
+      const src = rec.sourceIp || rec.source_ip || '';
+      const dest =
+        rec.destinationHost ||
+        rec.destinationDomain ||
+        rec.destination_domain ||
+        rec.destinationIp ||
+        rec.destination_ip ||
+        rec.sni_hostname ||
+        '';
+      const proto = rec.protocol || '';
+      const prov = rec.provider || '';
+
       const matchesSearch =
         searchTerm === '' ||
-        (rec.sourceIp && rec.sourceIp.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (rec.destinationHost && rec.destinationHost.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (rec.destinationDomain && rec.destinationDomain.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (rec.destinationIp && rec.destinationIp.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (rec.protocol && rec.protocol.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (rec.provider && rec.provider.toLowerCase().includes(searchTerm.toLowerCase()));
+        src.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dest.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        proto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        prov.toLowerCase().includes(searchTerm.toLowerCase());
 
+      const risk = (rec.riskLevel || rec.risk_level || rec.classification || '').toLowerCase();
       const matchesRisk =
         riskFilter === 'all' ||
-        (rec.riskLevel && rec.riskLevel.toLowerCase() === riskFilter.toLowerCase()) ||
-        (rec.classification && rec.classification.toLowerCase() === riskFilter.toLowerCase());
+        risk === riskFilter.toLowerCase();
 
       return matchesSearch && matchesRisk;
     });
@@ -515,15 +526,28 @@ export const TrafficPage: React.FC = () => {
                       const destDisplay =
                         item.destinationHost ||
                         item.destinationDomain ||
+                        item.destination_domain ||
                         item.destinationIp ||
+                        item.destination_ip ||
+                        item.sni_hostname ||
+                        'Not available';
+
+                      const sourceDisplay =
+                        item.sourceIp ||
+                        item.source_ip ||
                         'Not available';
 
                       const portDisplay =
                         item.destinationPort !== undefined
                           ? item.destinationPort
+                          : item.destination_port !== undefined
+                          ? item.destination_port
                           : item.port !== undefined
                           ? item.port
                           : 'Not available';
+
+                      const bytesSentVal = item.bytesSent ?? item.bytes_sent;
+                      const bytesRecvVal = item.bytesReceived ?? item.bytes_received;
 
                       const evidenceDisplay = item.detectionEvidence
                         ? Array.isArray(item.detectionEvidence)
@@ -533,10 +557,10 @@ export const TrafficPage: React.FC = () => {
                         ? Array.isArray(item.evidence)
                           ? item.evidence.join(', ')
                           : item.evidence
-                        : 'Not available';
+                        : item.sni_hostname || item.http_uri || 'Not available';
 
                       const classificationDisplay =
-                        item.classification || item.riskLevel || 'Not available';
+                        item.classification || item.riskLevel || item.risk_level || 'Not available';
 
                       return (
                         <tr
@@ -547,7 +571,7 @@ export const TrafficPage: React.FC = () => {
                             {item.timestamp || 'Not available'}
                           </td>
                           <td className="py-2.5 px-3 text-[#F4F4F0] font-bold whitespace-nowrap">
-                            {item.sourceIp || 'Not available'}
+                            {sourceDisplay}
                           </td>
                           <td className="py-2.5 px-3 text-[#FFCC00]">
                             {destDisplay}
@@ -563,10 +587,10 @@ export const TrafficPage: React.FC = () => {
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-[#9A9A91]">
-                            {item.bytesSent !== undefined ? `${item.bytesSent.toLocaleString()} B` : 'Not available'}
+                            {bytesSentVal !== undefined ? `${bytesSentVal.toLocaleString()} B` : 'Not available'}
                           </td>
                           <td className="py-2.5 px-3 text-[#9A9A91]">
-                            {item.bytesReceived !== undefined ? `${item.bytesReceived.toLocaleString()} B` : 'Not available'}
+                            {bytesRecvVal !== undefined ? `${bytesRecvVal.toLocaleString()} B` : 'Not available'}
                           </td>
                           <td className="py-2.5 px-3">
                             {classificationDisplay !== 'Not available' ? (

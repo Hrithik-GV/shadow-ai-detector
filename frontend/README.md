@@ -31,17 +31,19 @@ The following REST endpoints form the contract between the frontend and the back
 
 | Method | Endpoint | Description | Request Format | Response Schema |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Backend availability probe (if implemented) | None | `{ status: string, version?: string, uptime?: number }` |
-| `POST` | `/api/traffic/analyze` | Submit traffic capture file for AI analysis | `multipart/form-data` (`file: File`) | `{ analysisId: string, status: string, message: string }` |
-| `GET` | `/api/traffic/{analysis_id}` | Retrieve results of traffic analysis job | None | `{ analysisId, status, summary, records: [...] }` |
-| `GET` | `/api/inventory` | Retrieve catalog of discovered AI endpoints | None | `EndpointInventoryItem[]` |
-| `GET` | `/api/inventory/{endpoint_id}` | Retrieve detailed endpoint metadata | None | `EndpointDetail` |
-| `GET` | `/api/dashboard/stats` | Retrieve summary operational counts | None | `DashboardStats` |
-| `GET` | `/api/reports/metrics` | Retrieve model evaluation metrics | None | `TestEvaluationMetrics` |
-| `GET` | `/api/risks` | Retrieve detected risk policy violations | None | `RiskAssessment[]` |
+| `GET` | `/health` | Backend availability & DB status probe | None | `HealthCheckResponse` |
+| `POST` | `/api/traffic/analyze` | Submit traffic capture file for AI analysis | `multipart/form-data` (`file: File`) | `TrafficAnalyzeResponse` (`id`, `summary`, `valid_rows`) |
+| `GET` | `/api/traffic/{analysis_id}` | Retrieve results and aggregate summary | None | `TrafficAnalysisDetailResponse` |
+| `GET` | `/api/traffic/{analysis_id}/records` | Retrieve paginated flow records | Query (`limit`, `offset`) | `PaginatedTrafficRecordsResponse` |
+| `GET` | `/api/traffic` | Retrieve analysis history | Query (`limit`, `offset`) | `PaginatedTrafficAnalysesResponse` |
+| `GET` | `/api/inventory` | Retrieve catalog of discovered AI endpoints | None | `EndpointInventoryItem[]` (Pending backend) |
+| `GET` | `/api/inventory/{endpoint_id}` | Retrieve detailed endpoint metadata | None | `EndpointDetail` (Pending backend) |
+| `GET` | `/api/dashboard/stats` | Retrieve summary operational counts | None | `DashboardStats` (Pending backend) |
+| `GET` | `/api/reports/metrics` | Retrieve model evaluation metrics | None | `TestEvaluationMetrics` (Pending backend) |
+| `GET` | `/api/risks` | Retrieve detected risk policy violations | None | `RiskAssessment[]` (Pending backend) |
 
 ### File Uploads (`/api/traffic/analyze`)
-Traffic captures (`.pcap`, `.pcapng`, `.json`, `.csv`, `.log`) are submitted as **`multipart/form-data`** containing the file payload. The frontend does not send raw JSON for file upload requests.
+Traffic captures (`.csv`, `.json`, `.jsonl`, `.ndjson`) are submitted as **`multipart/form-data`** with field name `file`. The frontend enforces maximum 50 MB client-side before submission.
 
 ---
 

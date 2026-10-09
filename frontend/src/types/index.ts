@@ -79,19 +79,33 @@ export interface DashboardStats {
  */
 export interface TrafficRecord {
   id?: string;
+  analysis_id?: string;
+  analysisId?: string;
   timestamp?: string;
   sourceIp?: string;
+  source_ip?: string;
   destinationIp?: string;
+  destination_ip?: string;
   destinationHost?: string;
   destinationDomain?: string;
+  destination_domain?: string;
   destinationPort?: number;
+  destination_port?: number;
   port?: number;
   protocol?: string;
   bytesSent?: number;
+  bytes_sent?: number;
   bytesReceived?: number;
+  bytes_received?: number;
   bytesTransferred?: number;
+  http_method?: string;
+  http_uri?: string;
+  http_status_code?: number;
+  user_agent?: string;
+  sni_hostname?: string;
   classification?: string;
   riskLevel?: RiskLevel;
+  risk_level?: RiskLevel;
   detectionEvidence?: string | string[];
   evidence?: string | string[];
   provider?: string;
@@ -105,11 +119,20 @@ export interface TrafficRecord {
 export interface TrafficAnalysisSummary {
   totalPackets?: number;
   totalRecords?: number;
+  total_valid_records?: number;
+  total_bytes_sent?: number;
+  total_bytes_received?: number;
+  unique_source_ips?: number;
+  unique_destination_domains?: number;
+  unique_destination_ips?: number;
   aiFlowsDetected?: number;
   uniqueProviders?: number;
   highRiskFlows?: number;
   detectedProtocols?: string[];
+  protocols?: string[];
   analyzedAt?: string;
+  earliest_timestamp?: string;
+  latest_timestamp?: string;
 }
 
 /**
@@ -117,23 +140,43 @@ export interface TrafficAnalysisSummary {
  */
 export interface TrafficAnalysisResult {
   analysisId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  id?: string;
+  original_filename?: string;
+  file_format?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | string;
+  total_rows_received?: number;
+  valid_rows?: number;
+  rejected_rows?: number;
   createdAt?: string;
+  created_at?: string;
   completedAt?: string;
+  updated_at?: string;
   timestamp?: string;
   summary?: TrafficAnalysisSummary;
   records?: TrafficRecord[];
   totalRecords?: number;
   errorMessage?: string;
+  error_details?: string | null;
 }
 
 /**
  * Traffic analysis submission response (POST /api/traffic/analyze)
  */
 export interface TrafficAnalyzeSubmitResponse {
-  analysisId: string;
-  status: 'pending' | 'processing' | 'completed';
-  message: string;
+  id?: string;
+  analysisId?: string;
+  original_filename?: string;
+  file_format?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | string;
+  total_rows_received?: number;
+  valid_rows?: number;
+  rejected_rows?: number;
+  error_details?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  summary?: TrafficAnalysisSummary;
+  rejected_records?: unknown[];
+  message?: string;
 }
 
 /**

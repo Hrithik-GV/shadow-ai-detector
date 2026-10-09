@@ -9,7 +9,7 @@ export function normalizeApiError(error: unknown): ApiError {
   if (axios.isAxiosError(error)) {
     const axiosErr = error as AxiosError<{
       message?: string;
-      detail?: string;
+      detail?: unknown;
       error?: string;
     }>;
 
@@ -30,14 +30,39 @@ export function normalizeApiError(error: unknown): ApiError {
     }
 
     const resData = axiosErr.response.data;
-    const serverMessage =
-      (typeof resData === 'object' && resData !== null
-        ? resData.detail || resData.message || resData.error
-        : undefined) || axiosErr.response.statusText;
+    let serverMessage: string | undefined;
+
+    if (typeof resData === 'object' && resData !== null) {
+      if (typeof resData.detail === 'string') {
+        serverMessage = resData.detail;
+      } else if (Array.isArray(resData.detail)) {
+        serverMessage = resData.detail
+          .map((d: unknown) => {
+            if (typeof d === 'string') return d;
+            if (typeof d === 'object' && d !== null && 'msg' in d) {
+              const msgObj = d as { loc?: unknown[]; msg?: string };
+              const loc = Array.isArray(msgObj.loc) ? msgObj.loc.slice(1).join('.') : '';
+              return loc ? `${loc}: ${msgObj.msg}` : (msgObj.msg || JSON.stringify(d));
+            }
+            return JSON.stringify(d);
+          })
+          .join('; ');
+      } else if (typeof resData.message === 'string') {
+        serverMessage = resData.message;
+      } else if (typeof resData.error === 'string') {
+        serverMessage = resData.error;
+      }
+    } else if (typeof resData === 'string') {
+      serverMessage = resData;
+    }
+
+    if (!serverMessage) {
+      serverMessage = axiosErr.response.statusText;
+    }
 
     return {
       message:
-        typeof serverMessage === 'string'
+        typeof serverMessage === 'string' && serverMessage.trim().length > 0
           ? serverMessage
           : `HTTP ${axiosErr.response.status}: Request failed.`,
       status: axiosErr.response.status,
