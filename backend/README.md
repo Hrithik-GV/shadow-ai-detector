@@ -340,6 +340,138 @@ curl "http://localhost:8000/api/traffic?limit=10&offset=0"
 
 ---
 
+### 5. `GET /api/traffic/{analysis_id}/summary`
+Returns comprehensive aggregated summary statistics calculated strictly from actual persisted records for a single analysis run.
+
+**Example Request:**
+```bash
+curl "http://localhost:8000/api/traffic/e8d67a14-8f4b-4b12-b13c-7501062089f3/summary"
+```
+
+**Example Response (`200 OK`):**
+```json
+{
+  "total_records_received": 3,
+  "valid_records": 2,
+  "total_valid_records": 2,
+  "rejected_records": 1,
+  "unique_source_ips": 2,
+  "unique_destination_ips": 0,
+  "unique_destination_domains": 2,
+  "total_bytes_sent": 2000,
+  "total_bytes_received": 57000,
+  "bytes_sent_reported_count": 2,
+  "bytes_received_reported_count": 2,
+  "missing_bytes_sent_count": 0,
+  "missing_bytes_received_count": 0,
+  "protocols": ["TCP"],
+  "protocol_distribution": {
+    "TCP": 2
+  },
+  "missing_protocol_count": 0,
+  "earliest_timestamp": "2026-10-09T18:00:00Z",
+  "latest_timestamp": "2026-10-09T18:01:00Z",
+  "records_with_timestamp": 2,
+  "missing_timestamp_count": 0,
+  "record_type_note": "Counts represent ingested log records/events, which may or may not map 1:1 to unique TCP/network connections.",
+  "byte_calculation_note": "Missing byte counts are treated as unknown (null) and excluded from summation, not counted as zero."
+}
+```
+*Returns `404 Not Found` if `analysis_id` does not exist.*
+
+---
+
+### 6. `GET /api/dashboard/stats`
+Provides real summary statistics for the frontend Overview and Dashboard pages. Calculates aggregate statistics from saved database records.
+
+**Parameters:**
+- `analysis_id` (optional): UUID of a specific analysis run. If provided, statistics are scoped exclusively to that run (`scope="selected_analysis"`). If omitted, statistics aggregate across all saved analyses in the database (`scope="all_analyses"`).
+
+**Example Request (All Analyses):**
+```bash
+curl "http://localhost:8000/api/dashboard/stats"
+```
+
+**Example Response (`200 OK`):**
+```json
+{
+  "scope": "all_analyses",
+  "analysis_id": null,
+  "analyses_count": 5,
+  "scope_description": "Statistics aggregated across all 5 saved analysis runs in the database.",
+  "total_records_received": 15000,
+  "valid_records": 14850,
+  "rejected_records": 150,
+  "unique_source_ips": 42,
+  "unique_destination_ips": 88,
+  "unique_destination_domains": 19,
+  "total_bytes_sent": 14205000,
+  "total_bytes_received": 95400200,
+  "bytes_sent_reported_count": 14500,
+  "bytes_received_reported_count": 14500,
+  "missing_bytes_sent_count": 350,
+  "missing_bytes_received_count": 350,
+  "protocols": ["HTTP", "HTTPS", "TCP", "TLS"],
+  "protocol_distribution": {
+    "TCP": 8500,
+    "TLS": 5000,
+    "HTTPS": 1000,
+    "HTTP": 350
+  },
+  "missing_protocol_count": 0,
+  "earliest_timestamp": "2026-10-09T08:00:00Z",
+  "latest_timestamp": "2026-10-09T22:30:00Z",
+  "records_with_timestamp": 14850,
+  "missing_timestamp_count": 0,
+  "record_type_note": "Counts represent ingested log records/events, which may or may not map 1:1 to unique TCP/network connections.",
+  "byte_calculation_note": "Missing byte counts are treated as unknown (null) and excluded from summation, not counted as zero."
+}
+```
+
+**Example Request (Scoped to Single Analysis):**
+```bash
+curl "http://localhost:8000/api/dashboard/stats?analysis_id=e8d67a14-8f4b-4b12-b13c-7501062089f3"
+```
+*Returns `404 Not Found` if `analysis_id` is supplied but does not exist in the database.*
+
+---
+
+## Traffic Summary Statistics & Calculation Rules
+
+The summary statistics service adheres to strict calculation rules grounded strictly in real database records:
+
+### 1. Distinction Between Record Counts & Network Connections
+- **Log Records vs. Network Connections**: `valid_records` measures individual validated log entries ingested from CSV/JSON captures. A CSV row or JSON entry represents an event record; it must **not** be assumed to map 1:1 to discrete TCP socket connections or HTTP sessions unless explicitly guaranteed by the capture source format.
+- Every summary response includes `record_type_note` explicitly stating this distinction.
+
+### 2. Missing Metadata (Unknown vs. Zero)
+- Missing values (`NULL`) in optional fields (`bytes_sent`, `bytes_received`, `timestamp`, `protocol`, `source_ip`, `destination_domain`, `destination_ip`) are treated as **unknown**, never as zero.
+- **Byte Totals**: `total_bytes_sent` and `total_bytes_received` are calculated strictly as `SUM(...)` over rows where the value is non-null. Rows with omitted byte values are excluded from the sum (not counted as 0).
+- **Completeness Tracking**: Omissions are explicitly tracked via `missing_bytes_sent_count`, `missing_bytes_received_count`, `missing_timestamp_count`, and `missing_protocol_count`.
+
+### 3. Calculation Field Matrix
+
+| Field | Source / Rule | Handling of Missing / Null Values |
+|---|---|---|
+| `total_records_received` | `TrafficAnalysis.total_rows_received` | Always integer >= 0 |
+| `valid_records` | `COUNT(TrafficRecord.id)` | Integer >= 0 |
+| `rejected_records` | `TrafficAnalysis.rejected_rows` | Integer >= 0 |
+| `unique_source_ips` | `COUNT(DISTINCT TrafficRecord.source_ip)` | Nulls explicitly excluded |
+| `unique_destination_ips` | `COUNT(DISTINCT TrafficRecord.destination_ip)` | Nulls explicitly excluded |
+| `unique_destination_domains` | `COUNT(DISTINCT TrafficRecord.destination_domain)` | Nulls explicitly excluded |
+| `total_bytes_sent` | `SUM(TrafficRecord.bytes_sent)` | Nulls excluded from sum; 0 if no values |
+| `total_bytes_received` | `SUM(TrafficRecord.bytes_received)` | Nulls excluded from sum; 0 if no values |
+| `missing_bytes_sent_count` | `valid_records - COUNT(TrafficRecord.bytes_sent)` | Tracks records with omitted bytes_sent |
+| `missing_bytes_received_count` | `valid_records - COUNT(TrafficRecord.bytes_received)` | Tracks records with omitted bytes_received |
+| `protocol_distribution` | `GROUP BY protocol` | Normalized to uppercase; maps `{ [protocol]: count }` |
+| `missing_protocol_count` | Count of rows where `protocol IS NULL` | Tracked separately from observed protocols |
+| `earliest_timestamp` | `MIN(TrafficRecord.timestamp)` | Null if no records with timestamps |
+| `latest_timestamp` | `MAX(TrafficRecord.timestamp)` | Null if no records with timestamps |
+| `records_with_timestamp` | `COUNT(TrafficRecord.timestamp)` | Count of records with non-null timestamp |
+| `missing_timestamp_count` | `valid_records - records_with_timestamp` | Count of records with missing timestamp |
+
+---
+
 ## Getting Started
 
 ### 1. Prerequisites

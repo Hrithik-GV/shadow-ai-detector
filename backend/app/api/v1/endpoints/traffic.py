@@ -20,6 +20,7 @@ from app.schemas.traffic_api import (
     TrafficAnalysisDetailResponse,
     TrafficAnalysisListItem,
     TrafficAnalyzeResponse,
+    TrafficMetricsSummary,
     TrafficRecordResponse,
 )
 from app.services.exceptions import (
@@ -35,6 +36,7 @@ from app.services.traffic_analysis_service import (
     get_paginated_records,
     process_and_persist_traffic_file,
 )
+from app.services.traffic_summary_service import TrafficSummaryService
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +141,26 @@ def get_analysis_records(
         offset=offset,
         records=[TrafficRecordResponse.model_validate(r) for r in records],
     )
+
+
+@router.get(
+    "/{analysis_id}/summary",
+    response_model=TrafficMetricsSummary,
+    summary="Get summary statistics for an analysis",
+    description="Returns reliable summary statistics calculated strictly from actual persisted records for this analysis.",
+)
+def get_analysis_summary(
+    analysis_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> TrafficMetricsSummary:
+    """Retrieve real summary statistics for a single analysis run."""
+    summary = TrafficSummaryService.get_analysis_summary_by_id(db, analysis_id)
+    if summary is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis with ID '{analysis_id}' was not found",
+        )
+    return summary
 
 
 @router.get(

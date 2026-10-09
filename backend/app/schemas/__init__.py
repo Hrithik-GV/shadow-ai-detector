@@ -11,6 +11,7 @@ from app.schemas.traffic import (
     validate_traffic_record,
 )
 from app.schemas.traffic_api import (
+    DashboardStatsResponse,
     PaginatedTrafficAnalysesResponse,
     PaginatedTrafficRecordsResponse,
     TrafficAnalysisDetailResponse,
@@ -39,4 +40,5 @@ __all__ = [
     "TrafficAnalyzeResponse",
     "PaginatedTrafficRecordsResponse",
     "PaginatedTrafficAnalysesResponse",
+    "DashboardStatsResponse",
 ]

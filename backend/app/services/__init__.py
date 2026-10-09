@@ -18,6 +18,7 @@ from app.services.traffic_analysis_service import (
     get_paginated_records,
     process_and_persist_traffic_file,
 )
+from app.services.traffic_summary_service import TrafficSummaryService
 
 __all__ = [
     "TrafficIngestionService",
@@ -34,4 +35,5 @@ __all__ = [
     "get_analysis_by_id",
     "get_paginated_records",
     "get_paginated_analyses",
+    "TrafficSummaryService",
 ]

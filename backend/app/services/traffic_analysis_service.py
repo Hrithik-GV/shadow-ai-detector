@@ -13,43 +13,16 @@ from app.services.ingestion import IngestionResult, TrafficIngestionService
 logger = logging.getLogger(__name__)
 
 
+from app.services.traffic_summary_service import TrafficSummaryService
+
+
 def compute_analysis_metrics(db: Session, analysis_id: uuid.UUID) -> TrafficMetricsSummary:
     """Computes real aggregate metrics from persisted traffic records in PostgreSQL."""
-    stmt = select(
-        func.count(TrafficRecord.id).label("total_records"),
-        func.coalesce(func.sum(TrafficRecord.bytes_sent), 0).label("bytes_sent"),
-        func.coalesce(func.sum(TrafficRecord.bytes_received), 0).label("bytes_received"),
-        func.count(distinct(TrafficRecord.source_ip)).label("unique_source_ips"),
-        func.count(distinct(TrafficRecord.destination_domain)).label("unique_destination_domains"),
-        func.count(distinct(TrafficRecord.destination_ip)).label("unique_destination_ips"),
-        func.min(TrafficRecord.timestamp).label("earliest_timestamp"),
-        func.max(TrafficRecord.timestamp).label("latest_timestamp"),
-    ).where(TrafficRecord.analysis_id == analysis_id)
+    summary = TrafficSummaryService.get_analysis_summary_by_id(db, analysis_id)
+    if summary is None:
+        raise ValueError(f"Analysis with ID '{analysis_id}' does not exist.")
+    return summary
 
-    row = db.execute(stmt).one()
-
-    # Query distinct protocols observed
-    proto_stmt = (
-        select(TrafficRecord.protocol)
-        .where(
-            TrafficRecord.analysis_id == analysis_id,
-            TrafficRecord.protocol.is_not(None),
-        )
-        .distinct()
-    )
-    protocols = [str(p) for p in db.scalars(proto_stmt).all() if p]
-
-    return TrafficMetricsSummary(
-        total_valid_records=row.total_records or 0,
-        total_bytes_sent=int(row.bytes_sent or 0),
-        total_bytes_received=int(row.bytes_received or 0),
-        unique_source_ips=row.unique_source_ips or 0,
-        unique_destination_domains=row.unique_destination_domains or 0,
-        unique_destination_ips=row.unique_destination_ips or 0,
-        protocols=sorted(protocols),
-        earliest_timestamp=row.earliest_timestamp,
-        latest_timestamp=row.latest_timestamp,
-    )
 
 
 def process_and_persist_traffic_file(
@@ -97,7 +70,7 @@ def process_and_persist_traffic_file(
             )
 
         # Step 5: Derive real metrics summary from database
-        summary = compute_analysis_metrics(db, analysis.id)
+        summary = TrafficSummaryService.calculate_analysis_summary(db, analysis)
 
         # Commit transaction
         db.commit()
@@ -121,7 +94,7 @@ def get_analysis_by_id(
     if not analysis:
         return None
 
-    summary = compute_analysis_metrics(db, analysis_id)
+    summary = TrafficSummaryService.calculate_analysis_summary(db, analysis)
     return analysis, summary
 
 
