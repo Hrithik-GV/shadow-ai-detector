@@ -177,90 +177,118 @@ class TrafficSummaryService:
             )
 
         # Global aggregation across all analyses in database
-        analysis_totals_stmt = select(
-            func.count(TrafficAnalysis.id).label("analyses_count"),
-            func.coalesce(func.sum(TrafficAnalysis.total_rows_received), 0).label("total_records_received"),
-            func.coalesce(func.sum(TrafficAnalysis.valid_rows), 0).label("valid_records"),
-            func.coalesce(func.sum(TrafficAnalysis.rejected_rows), 0).label("rejected_records"),
-        )
-        analysis_totals = db.execute(analysis_totals_stmt).one()
-        analyses_count = analysis_totals.analyses_count or 0
-
-        # Aggregate across all records in DB
-        records_totals_stmt = select(
-            func.count(TrafficRecord.id).label("total_valid_records"),
-            func.coalesce(func.sum(TrafficRecord.bytes_sent), 0).label("total_bytes_sent"),
-            func.coalesce(func.sum(TrafficRecord.bytes_received), 0).label("total_bytes_received"),
-            func.count(distinct(TrafficRecord.source_ip)).label("unique_source_ips"),
-            func.count(distinct(TrafficRecord.destination_ip)).label("unique_destination_ips"),
-            func.count(distinct(TrafficRecord.destination_domain)).label("unique_destination_domains"),
-            func.count(TrafficRecord.bytes_sent).label("bytes_sent_reported_count"),
-            func.count(TrafficRecord.bytes_received).label("bytes_received_reported_count"),
-            func.count(TrafficRecord.timestamp).label("records_with_timestamp"),
-            func.min(TrafficRecord.timestamp).label("earliest_timestamp"),
-            func.max(TrafficRecord.timestamp).label("latest_timestamp"),
-        )
-        rec_row = db.execute(records_totals_stmt).one()
-
-        total_valid = rec_row.total_valid_records or 0
-        bytes_sent_reported = rec_row.bytes_sent_reported_count or 0
-        bytes_received_reported = rec_row.bytes_received_reported_count or 0
-        records_with_ts = rec_row.records_with_timestamp or 0
-
-        missing_bytes_sent = max(0, total_valid - bytes_sent_reported)
-        missing_bytes_received = max(0, total_valid - bytes_received_reported)
-        missing_timestamp = max(0, total_valid - records_with_ts)
-
-        # Protocol distribution across all records
-        proto_stmt = (
-            select(
-                TrafficRecord.protocol,
-                func.count(TrafficRecord.id).label("record_count"),
+        try:
+            analysis_totals_stmt = select(
+                func.count(TrafficAnalysis.id).label("analyses_count"),
+                func.coalesce(func.sum(TrafficAnalysis.total_rows_received), 0).label("total_records_received"),
+                func.coalesce(func.sum(TrafficAnalysis.valid_rows), 0).label("valid_records"),
+                func.coalesce(func.sum(TrafficAnalysis.rejected_rows), 0).label("rejected_records"),
             )
-            .group_by(TrafficRecord.protocol)
-            .order_by(func.count(TrafficRecord.id).desc())
-        )
-        proto_rows = db.execute(proto_stmt).all()
+            analysis_totals = db.execute(analysis_totals_stmt).one()
+            analyses_count = analysis_totals.analyses_count or 0
 
-        protocol_dist: Dict[str, int] = {}
-        distinct_protocols: List[str] = []
-        missing_protocol_count = 0
+            # Aggregate across all records in DB
+            records_totals_stmt = select(
+                func.count(TrafficRecord.id).label("total_valid_records"),
+                func.coalesce(func.sum(TrafficRecord.bytes_sent), 0).label("total_bytes_sent"),
+                func.coalesce(func.sum(TrafficRecord.bytes_received), 0).label("total_bytes_received"),
+                func.count(distinct(TrafficRecord.source_ip)).label("unique_source_ips"),
+                func.count(distinct(TrafficRecord.destination_ip)).label("unique_destination_ips"),
+                func.count(distinct(TrafficRecord.destination_domain)).label("unique_destination_domains"),
+                func.count(TrafficRecord.bytes_sent).label("bytes_sent_reported_count"),
+                func.count(TrafficRecord.bytes_received).label("bytes_received_reported_count"),
+                func.count(TrafficRecord.timestamp).label("records_with_timestamp"),
+                func.min(TrafficRecord.timestamp).label("earliest_timestamp"),
+                func.max(TrafficRecord.timestamp).label("latest_timestamp"),
+            )
+            rec_row = db.execute(records_totals_stmt).one()
 
-        for proto_row in proto_rows:
-            p_val = proto_row.protocol
-            cnt = proto_row.record_count
-            if p_val is None or str(p_val).strip() == "":
-                missing_protocol_count += cnt
-            else:
-                proto_str = str(p_val).strip().upper()
-                protocol_dist[proto_str] = protocol_dist.get(proto_str, 0) + cnt
-                if proto_str not in distinct_protocols:
-                    distinct_protocols.append(proto_str)
+            total_valid = rec_row.total_valid_records or 0
+            bytes_sent_reported = rec_row.bytes_sent_reported_count or 0
+            bytes_received_reported = rec_row.bytes_received_reported_count or 0
+            records_with_ts = rec_row.records_with_timestamp or 0
 
-        distinct_protocols.sort()
+            missing_bytes_sent = max(0, total_valid - bytes_sent_reported)
+            missing_bytes_received = max(0, total_valid - bytes_received_reported)
+            missing_timestamp = max(0, total_valid - records_with_ts)
 
-        return DashboardStatsResponse(
-            scope="all_analyses",
-            analysis_id=None,
-            analyses_count=analyses_count,
-            scope_description=f"Statistics aggregated across all {analyses_count} saved analysis runs in the database.",
-            total_records_received=int(analysis_totals.total_records_received or 0),
-            valid_records=total_valid,
-            rejected_records=int(analysis_totals.rejected_records or 0),
-            unique_source_ips=rec_row.unique_source_ips or 0,
-            unique_destination_ips=rec_row.unique_destination_ips or 0,
-            unique_destination_domains=rec_row.unique_destination_domains or 0,
-            total_bytes_sent=int(rec_row.total_bytes_sent or 0),
-            total_bytes_received=int(rec_row.total_bytes_received or 0),
-            bytes_sent_reported_count=bytes_sent_reported,
-            bytes_received_reported_count=bytes_received_reported,
-            missing_bytes_sent_count=missing_bytes_sent,
-            missing_bytes_received_count=missing_bytes_received,
-            protocols=distinct_protocols,
-            protocol_distribution=protocol_dist,
-            missing_protocol_count=missing_protocol_count,
-            earliest_timestamp=rec_row.earliest_timestamp,
-            latest_timestamp=rec_row.latest_timestamp,
-            records_with_timestamp=records_with_ts,
-            missing_timestamp_count=missing_timestamp,
-        )
+            # Protocol distribution across all records
+            proto_stmt = (
+                select(
+                    TrafficRecord.protocol,
+                    func.count(TrafficRecord.id).label("record_count"),
+                )
+                .group_by(TrafficRecord.protocol)
+                .order_by(func.count(TrafficRecord.id).desc())
+            )
+            proto_rows = db.execute(proto_stmt).all()
+
+            protocol_dist: Dict[str, int] = {}
+            distinct_protocols: List[str] = []
+            missing_protocol_count = 0
+
+            for proto_row in proto_rows:
+                p_val = proto_row.protocol
+                cnt = proto_row.record_count
+                if p_val is None or str(p_val).strip() == "":
+                    missing_protocol_count += cnt
+                else:
+                    proto_str = str(p_val).strip().upper()
+                    protocol_dist[proto_str] = protocol_dist.get(proto_str, 0) + cnt
+                    if proto_str not in distinct_protocols:
+                        distinct_protocols.append(proto_str)
+
+            distinct_protocols.sort()
+
+            return DashboardStatsResponse(
+                scope="all_analyses",
+                analysis_id=None,
+                analyses_count=analyses_count,
+                scope_description=f"Statistics aggregated across all {analyses_count} saved analysis runs in the database.",
+                total_records_received=int(analysis_totals.total_records_received or 0),
+                valid_records=total_valid,
+                rejected_records=int(analysis_totals.rejected_records or 0),
+                unique_source_ips=rec_row.unique_source_ips or 0,
+                unique_destination_ips=rec_row.unique_destination_ips or 0,
+                unique_destination_domains=rec_row.unique_destination_domains or 0,
+                total_bytes_sent=int(rec_row.total_bytes_sent or 0),
+                total_bytes_received=int(rec_row.total_bytes_received or 0),
+                bytes_sent_reported_count=bytes_sent_reported,
+                bytes_received_reported_count=bytes_received_reported,
+                missing_bytes_sent_count=missing_bytes_sent,
+                missing_bytes_received_count=missing_bytes_received,
+                protocols=distinct_protocols,
+                protocol_distribution=protocol_dist,
+                missing_protocol_count=missing_protocol_count,
+                earliest_timestamp=rec_row.earliest_timestamp,
+                latest_timestamp=rec_row.latest_timestamp,
+                records_with_timestamp=records_with_ts,
+                missing_timestamp_count=missing_timestamp,
+            )
+        except Exception as exc:
+            logger.warning(f"Error querying dashboard statistics from database: {exc}. Returning initial empty stats.")
+            return DashboardStatsResponse(
+                scope="all_analyses",
+                analysis_id=None,
+                analyses_count=0,
+                scope_description="Statistics aggregated across all 0 saved analysis runs in the database.",
+                total_records_received=0,
+                valid_records=0,
+                rejected_records=0,
+                unique_source_ips=0,
+                unique_destination_ips=0,
+                unique_destination_domains=0,
+                total_bytes_sent=0,
+                total_bytes_received=0,
+                bytes_sent_reported_count=0,
+                bytes_received_reported_count=0,
+                missing_bytes_sent_count=0,
+                missing_bytes_received_count=0,
+                protocols=[],
+                protocol_distribution={},
+                missing_protocol_count=0,
+                earliest_timestamp=None,
+                latest_timestamp=None,
+                records_with_timestamp=0,
+                missing_timestamp_count=0,
+            )

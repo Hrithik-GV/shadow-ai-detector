@@ -20,6 +20,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(
         f"Starting {settings.APP_NAME} v{settings.APP_VERSION} [{settings.APP_ENV}]"
     )
+    # Ensure database schema is initialized
+    try:
+        from app.db.base import Base
+        from app.db.session import engine
+        import app.models.traffic  # noqa: F401 - register models
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database schema initialized successfully.")
+    except Exception as exc:
+        logger.warning(f"Could not automatically initialize database schema: {exc}")
+
     yield
     logger.info(f"Shutting down {settings.APP_NAME}")
 
@@ -36,14 +46,30 @@ def create_application() -> FastAPI:
     )
 
     # Configure CORS middleware
-    if settings.BACKEND_CORS_ORIGINS:
-        application.add_middleware(
-            CORSMiddleware,
-            allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
+    cors_origins = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS] if settings.BACKEND_CORS_ORIGINS else ["*"]
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    from fastapi import Request
+    from fastapi.responses import JSONResponse
+
+    @application.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        logger.exception(f"Unhandled exception processing {request.method} {request.url.path}: {exc}")
+        resp = JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error occurred.", "error": str(exc)},
         )
+        origin = request.headers.get("origin")
+        if origin:
+            resp.headers["Access-Control-Allow-Origin"] = origin
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
+        return resp
 
     # Direct top-level health check endpoint
     application.add_api_route(
