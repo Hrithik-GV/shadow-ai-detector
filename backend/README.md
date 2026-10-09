@@ -97,6 +97,50 @@ shadow-ai-detector/
 
 ---
 
+## Traffic Record Schema & Validation Rules
+
+Incoming network records are parsed, alias-normalized, and validated using Pydantic schemas in `app/schemas/traffic.py`.
+
+### 1. Canonical Fields & Validation
+
+| Field | Type | Required? | Validation Rules |
+|---|---|---|---|
+| `timestamp` | `datetime` (UTC) | Optional | Accepts ISO 8601 strings, UNIX epoch seconds, epoch milliseconds, and standard datetime strings. Normalized to UTC timezone. |
+| `source_ip` | `str` | Optional | Validated against IPv4 and IPv6 syntax via Python `ipaddress`. |
+| `destination_ip` | `str` | Conditional* | Validated IPv4 or IPv6 address. (*At least one of `destination_ip` or `destination_domain` must be provided). |
+| `destination_domain` | `str` | Conditional* | Validated domain name or FQDN (<= 253 chars, labels <= 63 chars, no URL schemes or paths, lowercase). (*At least one of `destination_ip` or `destination_domain` must be provided). |
+| `destination_port` | `int` | Optional | Integer in range `1 <= port <= 65535`. |
+| `protocol` | `str` | Optional | Uppercase transport/app protocol (`TCP`, `UDP`, `TLS`, `HTTP`, etc.). Whitespace disallowed. |
+| `bytes_sent` | `int` | Optional | Non-negative integer (`>= 0`). |
+| `bytes_received` | `int` | Optional | Non-negative integer (`>= 0`). |
+| `http_method` | `str` | Optional | Uppercase standard HTTP verb (`GET`, `POST`, `PUT`, `DELETE`, etc.). |
+| `http_uri` | `str` | Optional | Preserved raw request path or URI. |
+| `http_status_code` | `int` | Optional | Integer between `100` and `599`. |
+| `user_agent` | `str` | Optional | Raw client user-agent string. |
+| `sni_hostname` | `str` | Optional | Lowercase TLS Server Name Indication domain. |
+| `extra_metadata` | `dict` | Optional | Any extraneous log columns are preserved here without causing validation failure. |
+
+### 2. Supported Column Aliases (Case-Insensitive)
+
+- **Timestamp**: `time`, `ts`, `datetime`, `date_time`, `@timestamp`, `event_time`, `packet_time`
+- **Source IP**: `src_ip`, `srcip`, `client_ip`, `clientip`, `src_addr`, `source_address`, `src`, `source`
+- **Destination IP**: `dst_ip`, `dstip`, `dest_ip`, `server_ip`, `dst_addr`, `destination_address`, `dst`, `destination`
+- **Destination Domain**: `dst_domain`, `dest_domain`, `domain`, `host`, `hostname`, `server_name`, `target_domain`, `query`
+- **Destination Port**: `dst_port`, `dest_port`, `dstport`, `dport`, `port`, `server_port`
+- **Protocol**: `proto`, `ip_proto`, `transport`
+- **Bytes Sent**: `sent_bytes`, `bytes_out`, `bytes_tx`, `tx_bytes`, `out_bytes`, `payload_bytes_sent`
+- **Bytes Received**: `recv_bytes`, `received_bytes`, `bytes_in`, `bytes_rx`, `rx_bytes`, `in_bytes`, `payload_bytes_recv`
+- **HTTP / TLS**: `method`/`verb`, `uri`/`url`/`path`, `status`/`status_code`/`response_code`, `ua`/`agent`, `sni`/`tls_sni`/`server_name_indication`
+
+### 3. Validation & Sanitization Policies
+
+1. **Empty Values**: Empty strings (`""`, `"   "`), hyphens (`"-"`), and sentinels (`"null"`, `"none"`, `"N/A"`) are converted to `None` rather than triggering type conversion errors.
+2. **Missing Metadata**: A record is never rejected merely because optional fields (like `source_ip`, `protocol`, or `bytes`) are absent.
+3. **Required Identifiers**: To be actionable for Shadow AI detection, each record must specify at least one target: `destination_domain` OR `destination_ip`.
+4. **Secret Redaction**: When validation fails, any field matching credential patterns (`password`, `secret`, `token`, `auth`, `cookie`, `key`) is redacted to `[REDACTED]` in the error report.
+
+---
+
 ## Getting Started
 
 ### 1. Prerequisites
