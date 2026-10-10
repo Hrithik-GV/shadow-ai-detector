@@ -109,14 +109,16 @@ def get_policy_summary(
     response_model=List[PolicyAuditLogResponse],
     status_code=status.HTTP_200_OK,
     summary="Get policy audit logs",
-    description="Retrieves chronological audit trail of administrative policy modifications.",
+    description="Retrieves chronological audit trail of administrative policy modifications. Requires administrative authentication.",
 )
 def get_audit_logs(
-    limit: int = Query(50, ge=1, le=500),
+    skip: int = Query(0, ge=0, description="Offset for pagination"),
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of log records to return"),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ) -> List[PolicyAuditLogResponse]:
-    """Retrieves policy audit history."""
-    logs = PolicyService.get_audit_logs(db=db, limit=limit)
+    """Retrieves policy audit history with pagination and admin authentication."""
+    logs = PolicyService.get_audit_logs(db=db, skip=skip, limit=limit)
     return [
         PolicyAuditLogResponse(
             id=log.id,
@@ -132,6 +134,7 @@ def get_audit_logs(
             performedBy=log.performed_by,
             performed_by=log.performed_by,
             details=log.details,
+            outcome=(log.new_state or {}).get("outcome", "SUCCESS") if isinstance(log.new_state, dict) else "SUCCESS",
             timestamp=log.timestamp,
         )
         for log in logs

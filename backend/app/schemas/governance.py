@@ -156,6 +156,7 @@ class PolicyAuditLogResponse(BaseModel):
     performedBy: str = ""
     performed_by: str = ""
     details: Optional[str] = None
+    outcome: Optional[str] = "SUCCESS"
     timestamp: datetime
 
 

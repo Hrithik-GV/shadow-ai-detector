@@ -359,6 +359,7 @@ export interface PolicyAuditLog {
   performedBy?: string;
   performed_by?: string;
   details?: string | null;
+  outcome?: string | null;
   timestamp: string;
 }
 

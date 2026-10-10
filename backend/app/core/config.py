@@ -31,6 +31,10 @@ class Settings(BaseSettings):
 
     # Administrative Authorization Key (configurable via ADMIN_API_KEY env var)
     ADMIN_API_KEY: str = "shadow-ai-admin-secret-key"
+    SECRET_KEY: str = "shadow-ai-jwt-signing-secret-key-change-in-production"
+    ADMIN_USERNAME: str = "admin"
+    # PBKDF2-HMAC-SHA256 password hash for admin user (default password: "admin123")
+    ADMIN_PASSWORD_HASH: str = "pbkdf2_sha256$100000$a1b2c3d4e5f60718293a4b5c6d7e8f90$44138abc921d1c95bb573a09516cd4c82e8271fc3d9604b7c5f7f1bf26b6292d"
 
     # Ingestion & Upload Limits
     MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB

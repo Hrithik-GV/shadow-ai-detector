@@ -138,11 +138,16 @@ export async function deletePolicy(policyId: string, token?: string): Promise<{ 
 }
 
 /**
- * Fetch chronological policy audit logs
+ * Fetch chronological policy audit logs (Admin required)
  */
-export async function fetchPolicyAuditLogs(limit: number = 50): Promise<PolicyAuditLog[]> {
+export async function fetchPolicyAuditLogs(
+  limit: number = 50,
+  skip: number = 0,
+  token?: string
+): Promise<PolicyAuditLog[]> {
   const response = await apiClient.get<PolicyAuditLog[]>('/api/policies/audit-logs', {
-    params: { limit },
+    params: { limit, skip },
+    headers: getAuthHeaders(token),
   });
   return response.data;
 }

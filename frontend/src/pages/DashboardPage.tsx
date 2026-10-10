@@ -37,18 +37,15 @@ export const DashboardPage: React.FC = () => {
     stats?.totalTrafficRecords;
 
   const aiRelatedRecords =
-    stats?.valid_records ??
     stats?.aiRelatedRecords ??
     stats?.aiTrafficEvents ??
     stats?.aiFlowsCount;
 
   const totalEndpoints =
-    stats?.unique_destination_domains ??
     stats?.totalAiEndpoints ??
     stats?.totalEndpoints;
 
   const activeProviders =
-    stats?.unique_destination_domains ??
     stats?.activeProvidersCount ??
     stats?.totalProviders;
 

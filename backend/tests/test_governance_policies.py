@@ -79,7 +79,7 @@ def test_create_policy_and_domain_sanitization(client: TestClient, db_session: S
 
     # Verify audit log was recorded in PostgreSQL
     policy_id = created["id"]
-    audit_logs = client.get("/api/policies/audit-logs").json()
+    audit_logs = client.get("/api/policies/audit-logs", headers=ADMIN_HEADER).json()
     assert any(log["action"] == "create" and log["providerName"] == unique_provider for log in audit_logs)
 
 

@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.dashboard import router as dashboard_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.inventory import router as inventory_router
@@ -9,6 +10,7 @@ from app.api.v1.endpoints.traffic import router as traffic_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(health_router, tags=["Health"])
+api_v1_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
 api_v1_router.include_router(traffic_router, prefix="/traffic", tags=["Traffic"])
 api_v1_router.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
 api_v1_router.include_router(inventory_router, prefix="/inventory", tags=["Inventory"])

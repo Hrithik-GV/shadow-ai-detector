@@ -63,7 +63,7 @@ def create_application() -> FastAPI:
         logger.exception(f"Unhandled exception processing {request.method} {request.url.path}: {exc}")
         resp = JSONResponse(
             status_code=500,
-            content={"detail": "Internal server error occurred.", "error": str(exc)},
+            content={"detail": "Internal server error occurred. Please contact the system administrator."},
         )
         origin = request.headers.get("origin")
         if origin:
@@ -84,6 +84,10 @@ def create_application() -> FastAPI:
 
     # Mount API v1 router
     application.include_router(api_v1_router, prefix=settings.API_V1_STR)
+
+    # Mount unversioned /api/auth endpoint path
+    from app.api.v1.endpoints.auth import router as auth_router
+    application.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 
     # Mount unversioned /api/traffic endpoint path as specified in the API contract
     from app.api.v1.endpoints.traffic import router as traffic_router

@@ -72,62 +72,71 @@ class PolicyService:
         admin: AdminUser,
     ) -> AIGovernancePolicyModel:
         """Creates an enterprise AI governance policy and logs the audit event."""
-        # Check for duplicate active policy with the same provider name
-        existing_stmt = select(AIGovernancePolicyModel).where(
-            AIGovernancePolicyModel.provider_name.ilike(data.provider_name),
-            AIGovernancePolicyModel.is_enabled == True,  # noqa: E712
-        )
-        existing = db.execute(existing_stmt).scalars().first()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"An active policy for provider '{data.provider_name}' already exists (ID: {existing.external_id}). Update the existing policy instead of creating a duplicate.",
+        try:
+            # Check for duplicate active policy with the same provider name
+            existing_stmt = select(AIGovernancePolicyModel).where(
+                AIGovernancePolicyModel.provider_name.ilike(data.provider_name),
+                AIGovernancePolicyModel.is_enabled == True,  # noqa: E712
+            )
+            existing = db.execute(existing_stmt).scalars().first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"An active policy for provider '{data.provider_name}' already exists (ID: {existing.external_id}). Update the existing policy instead of creating a duplicate.",
+                )
+
+            external_id = f"POL-{uuid.uuid4().hex[:10].upper()}"
+            is_approved = data.approval_status.lower() == "approved"
+            rule = data.policy_rule or (
+                "POLICY-AI-00: Approved Enterprise Provider"
+                if is_approved
+                else "POLICY-AI-01: Prohibited Shadow AI Provider"
             )
 
-        external_id = f"POL-{uuid.uuid4().hex[:10].upper()}"
-        is_approved = data.approval_status.lower() == "approved"
-        rule = data.policy_rule or (
-            "POLICY-AI-00: Approved Enterprise Provider"
-            if is_approved
-            else "POLICY-AI-01: Prohibited Shadow AI Provider"
-        )
+            policy = AIGovernancePolicyModel(
+                external_id=external_id,
+                provider_name=data.provider_name,
+                domain_signatures=data.domain_signatures,
+                approval_status=data.approval_status.lower(),
+                is_enabled=data.is_enabled,
+                policy_rule=rule,
+                description=data.description,
+                created_by=admin.username,
+                updated_by=admin.username,
+            )
+            db.add(policy)
+            db.flush()
 
-        policy = AIGovernancePolicyModel(
-            external_id=external_id,
-            provider_name=data.provider_name,
-            domain_signatures=data.domain_signatures,
-            approval_status=data.approval_status.lower(),
-            is_enabled=data.is_enabled,
-            policy_rule=rule,
-            description=data.description,
-            created_by=admin.username,
-            updated_by=admin.username,
-        )
-        db.add(policy)
-        db.flush()
-
-        # Audit log entry
-        audit_log = PolicyAuditLogModel(
-            policy_id=policy.id,
-            action="create",
-            provider_name=policy.provider_name,
-            previous_state=None,
-            new_state={
-                "external_id": policy.external_id,
-                "provider_name": policy.provider_name,
-                "approval_status": policy.approval_status,
-                "domain_signatures": policy.domain_signatures,
-                "is_enabled": policy.is_enabled,
-                "policy_rule": policy.policy_rule,
-            },
-            performed_by=admin.username,
-            details=f"Created policy for '{policy.provider_name}' with status '{policy.approval_status}'.",
-        )
-        db.add(audit_log)
-        db.commit()
-        db.refresh(policy)
-        logger.info("Admin '%s' created AI governance policy '%s' (%s)", admin.username, policy.provider_name, policy.external_id)
-        return policy
+            # Audit log entry with outcome and before/after values
+            audit_log = PolicyAuditLogModel(
+                policy_id=policy.id,
+                action="create",
+                provider_name=policy.provider_name,
+                previous_state=None,
+                new_state={
+                    "external_id": policy.external_id,
+                    "provider_name": policy.provider_name,
+                    "approval_status": policy.approval_status,
+                    "domain_signatures": policy.domain_signatures,
+                    "is_enabled": policy.is_enabled,
+                    "policy_rule": policy.policy_rule,
+                    "outcome": "SUCCESS",
+                },
+                performed_by=admin.username,
+                details=f"Outcome: SUCCESS. Created policy for '{policy.provider_name}' with status '{policy.approval_status}'.",
+            )
+            db.add(audit_log)
+            db.commit()
+            db.refresh(policy)
+            logger.info("Admin '%s' created AI governance policy '%s' (%s)", admin.username, policy.provider_name, policy.external_id)
+            return policy
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception as exc:
+            db.rollback()
+            logger.error("Database error while creating policy for '%s': %s", data.provider_name, exc)
+            raise
 
     @staticmethod
     def update_policy(
@@ -137,73 +146,82 @@ class PolicyService:
         admin: AdminUser,
     ) -> AIGovernancePolicyModel:
         """Updates an existing policy and writes an audit log."""
-        policy = PolicyService.get_policy(db, policy_id)
-        if not policy:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Governance policy '{policy_id}' was not found.",
-            )
-
-        prev_state = {
-            "provider_name": policy.provider_name,
-            "approval_status": policy.approval_status,
-            "domain_signatures": list(policy.domain_signatures or []),
-            "is_enabled": policy.is_enabled,
-            "policy_rule": policy.policy_rule,
-            "description": policy.description,
-        }
-
-        # If changing provider_name, ensure no other active policy has that name
-        if data.provider_name and data.provider_name.lower() != policy.provider_name.lower():
-            conflict_stmt = select(AIGovernancePolicyModel).where(
-                AIGovernancePolicyModel.provider_name.ilike(data.provider_name),
-                AIGovernancePolicyModel.is_enabled == True,  # noqa: E712
-                AIGovernancePolicyModel.id != policy.id,
-            )
-            if db.execute(conflict_stmt).scalars().first():
+        try:
+            policy = PolicyService.get_policy(db, policy_id)
+            if not policy:
                 raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Another active policy for provider '{data.provider_name}' already exists.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Governance policy '{policy_id}' was not found.",
                 )
-            policy.provider_name = data.provider_name
 
-        if data.domain_signatures is not None:
-            policy.domain_signatures = data.domain_signatures
-        if data.approval_status is not None:
-            policy.approval_status = data.approval_status.lower()
-        if data.is_enabled is not None:
-            policy.is_enabled = data.is_enabled
-        if data.policy_rule is not None:
-            policy.policy_rule = data.policy_rule
-        if data.description is not None:
-            policy.description = data.description
+            prev_state = {
+                "provider_name": policy.provider_name,
+                "approval_status": policy.approval_status,
+                "domain_signatures": list(policy.domain_signatures or []),
+                "is_enabled": policy.is_enabled,
+                "policy_rule": policy.policy_rule,
+                "description": policy.description,
+            }
 
-        policy.updated_by = admin.username
-        policy.updated_at = datetime.now(timezone.utc)
+            # If changing provider_name, ensure no other active policy has that name
+            if data.provider_name and data.provider_name.lower() != policy.provider_name.lower():
+                conflict_stmt = select(AIGovernancePolicyModel).where(
+                    AIGovernancePolicyModel.provider_name.ilike(data.provider_name),
+                    AIGovernancePolicyModel.is_enabled == True,  # noqa: E712
+                    AIGovernancePolicyModel.id != policy.id,
+                )
+                if db.execute(conflict_stmt).scalars().first():
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Another active policy for provider '{data.provider_name}' already exists.",
+                    )
+                policy.provider_name = data.provider_name
 
-        new_state = {
-            "provider_name": policy.provider_name,
-            "approval_status": policy.approval_status,
-            "domain_signatures": list(policy.domain_signatures or []),
-            "is_enabled": policy.is_enabled,
-            "policy_rule": policy.policy_rule,
-            "description": policy.description,
-        }
+            if data.domain_signatures is not None:
+                policy.domain_signatures = data.domain_signatures
+            if data.approval_status is not None:
+                policy.approval_status = data.approval_status.lower()
+            if data.is_enabled is not None:
+                policy.is_enabled = data.is_enabled
+            if data.policy_rule is not None:
+                policy.policy_rule = data.policy_rule
+            if data.description is not None:
+                policy.description = data.description
 
-        audit_log = PolicyAuditLogModel(
-            policy_id=policy.id,
-            action="update",
-            provider_name=policy.provider_name,
-            previous_state=prev_state,
-            new_state=new_state,
-            performed_by=admin.username,
-            details=f"Updated policy configuration for '{policy.provider_name}'.",
-        )
-        db.add(audit_log)
-        db.commit()
-        db.refresh(policy)
-        logger.info("Admin '%s' updated AI policy '%s' (%s)", admin.username, policy.provider_name, policy.external_id)
-        return policy
+            policy.updated_by = admin.username
+            policy.updated_at = datetime.now(timezone.utc)
+
+            new_state = {
+                "provider_name": policy.provider_name,
+                "approval_status": policy.approval_status,
+                "domain_signatures": list(policy.domain_signatures or []),
+                "is_enabled": policy.is_enabled,
+                "policy_rule": policy.policy_rule,
+                "description": policy.description,
+                "outcome": "SUCCESS",
+            }
+
+            audit_log = PolicyAuditLogModel(
+                policy_id=policy.id,
+                action="update",
+                provider_name=policy.provider_name,
+                previous_state=prev_state,
+                new_state=new_state,
+                performed_by=admin.username,
+                details=f"Outcome: SUCCESS. Updated policy configuration for '{policy.provider_name}'.",
+            )
+            db.add(audit_log)
+            db.commit()
+            db.refresh(policy)
+            logger.info("Admin '%s' updated AI policy '%s' (%s)", admin.username, policy.provider_name, policy.external_id)
+            return policy
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception as exc:
+            db.rollback()
+            logger.error("Database error while updating policy '%s': %s", policy_id, exc)
+            raise
 
     @staticmethod
     def update_policy_status(
@@ -214,39 +232,47 @@ class PolicyService:
         notes: Optional[str] = None,
     ) -> AIGovernancePolicyModel:
         """Toggles or updates the approval status of an existing policy."""
-        policy = PolicyService.get_policy(db, policy_id)
-        if not policy:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Governance policy '{policy_id}' was not found.",
+        try:
+            policy = PolicyService.get_policy(db, policy_id)
+            if not policy:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Governance policy '{policy_id}' was not found.",
+                )
+
+            prev_status = policy.approval_status
+            cleaned_status = new_status.strip().lower()
+            policy.approval_status = cleaned_status
+            policy.updated_by = admin.username
+            policy.updated_at = datetime.now(timezone.utc)
+
+            # Update default rule text if using standard rules
+            if cleaned_status == "approved" and "POLICY-AI-01" in policy.policy_rule:
+                policy.policy_rule = "POLICY-AI-00: Approved Enterprise Provider"
+            elif cleaned_status != "approved" and "POLICY-AI-00" in policy.policy_rule:
+                policy.policy_rule = "POLICY-AI-01: Prohibited Shadow AI Provider"
+
+            audit_log = PolicyAuditLogModel(
+                policy_id=policy.id,
+                action="status_change",
+                provider_name=policy.provider_name,
+                previous_state={"approval_status": prev_status},
+                new_state={"approval_status": cleaned_status, "outcome": "SUCCESS"},
+                performed_by=admin.username,
+                details=notes or f"Outcome: SUCCESS. Approval status changed from '{prev_status}' to '{cleaned_status}'.",
             )
-
-        prev_status = policy.approval_status
-        cleaned_status = new_status.strip().lower()
-        policy.approval_status = cleaned_status
-        policy.updated_by = admin.username
-        policy.updated_at = datetime.now(timezone.utc)
-
-        # Update default rule text if using standard rules
-        if cleaned_status == "approved" and "POLICY-AI-01" in policy.policy_rule:
-            policy.policy_rule = "POLICY-AI-00: Approved Enterprise Provider"
-        elif cleaned_status != "approved" and "POLICY-AI-00" in policy.policy_rule:
-            policy.policy_rule = "POLICY-AI-01: Prohibited Shadow AI Provider"
-
-        audit_log = PolicyAuditLogModel(
-            policy_id=policy.id,
-            action="status_change",
-            provider_name=policy.provider_name,
-            previous_state={"approval_status": prev_status},
-            new_state={"approval_status": cleaned_status},
-            performed_by=admin.username,
-            details=notes or f"Approval status changed from '{prev_status}' to '{cleaned_status}'.",
-        )
-        db.add(audit_log)
-        db.commit()
-        db.refresh(policy)
-        logger.info("Admin '%s' changed status of policy '%s' from %s to %s", admin.username, policy.provider_name, prev_status, cleaned_status)
-        return policy
+            db.add(audit_log)
+            db.commit()
+            db.refresh(policy)
+            logger.info("Admin '%s' changed status of policy '%s' from %s to %s", admin.username, policy.provider_name, prev_status, cleaned_status)
+            return policy
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception as exc:
+            db.rollback()
+            logger.error("Database error while updating status of policy '%s': %s", policy_id, exc)
+            raise
 
     @staticmethod
     def disable_policy(
@@ -255,31 +281,39 @@ class PolicyService:
         admin: AdminUser,
     ) -> AIGovernancePolicyModel:
         """Disables an AI governance policy safely without deleting history."""
-        policy = PolicyService.get_policy(db, policy_id)
-        if not policy:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Governance policy '{policy_id}' was not found.",
+        try:
+            policy = PolicyService.get_policy(db, policy_id)
+            if not policy:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Governance policy '{policy_id}' was not found.",
+                )
+
+            policy.is_enabled = False
+            policy.updated_by = admin.username
+            policy.updated_at = datetime.now(timezone.utc)
+
+            audit_log = PolicyAuditLogModel(
+                policy_id=policy.id,
+                action="disable",
+                provider_name=policy.provider_name,
+                previous_state={"is_enabled": True},
+                new_state={"is_enabled": False, "outcome": "SUCCESS"},
+                performed_by=admin.username,
+                details=f"Outcome: SUCCESS. Policy disabled by admin '{admin.username}'.",
             )
-
-        policy.is_enabled = False
-        policy.updated_by = admin.username
-        policy.updated_at = datetime.now(timezone.utc)
-
-        audit_log = PolicyAuditLogModel(
-            policy_id=policy.id,
-            action="disable",
-            provider_name=policy.provider_name,
-            previous_state={"is_enabled": True},
-            new_state={"is_enabled": False},
-            performed_by=admin.username,
-            details=f"Policy disabled by admin '{admin.username}'.",
-        )
-        db.add(audit_log)
-        db.commit()
-        db.refresh(policy)
-        logger.info("Admin '%s' disabled policy '%s' (%s)", admin.username, policy.provider_name, policy.external_id)
-        return policy
+            db.add(audit_log)
+            db.commit()
+            db.refresh(policy)
+            logger.info("Admin '%s' disabled policy '%s' (%s)", admin.username, policy.provider_name, policy.external_id)
+            return policy
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception as exc:
+            db.rollback()
+            logger.error("Database error while disabling policy '%s': %s", policy_id, exc)
+            raise
 
     @staticmethod
     def delete_policy(
@@ -288,39 +322,48 @@ class PolicyService:
         admin: AdminUser,
     ) -> bool:
         """Deletes a policy record after preserving the audit log trail."""
-        policy = PolicyService.get_policy(db, policy_id)
-        if not policy:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Governance policy '{policy_id}' was not found.",
-            )
+        try:
+            policy = PolicyService.get_policy(db, policy_id)
+            if not policy:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Governance policy '{policy_id}' was not found.",
+                )
 
-        audit_log = PolicyAuditLogModel(
-            policy_id=policy.id,
-            action="delete",
-            provider_name=policy.provider_name,
-            previous_state={
-                "external_id": policy.external_id,
-                "provider_name": policy.provider_name,
-                "approval_status": policy.approval_status,
-                "is_enabled": policy.is_enabled,
-            },
-            new_state=None,
-            performed_by=admin.username,
-            details=f"Policy '{policy.provider_name}' deleted.",
-        )
-        db.add(audit_log)
-        db.delete(policy)
-        db.commit()
-        logger.info("Admin '%s' deleted policy '%s'", admin.username, policy.provider_name)
-        return True
+            audit_log = PolicyAuditLogModel(
+                policy_id=policy.id,
+                action="delete",
+                provider_name=policy.provider_name,
+                previous_state={
+                    "external_id": policy.external_id,
+                    "provider_name": policy.provider_name,
+                    "approval_status": policy.approval_status,
+                    "is_enabled": policy.is_enabled,
+                },
+                new_state={"outcome": "SUCCESS"},
+                performed_by=admin.username,
+                details=f"Outcome: SUCCESS. Policy '{policy.provider_name}' deleted.",
+            )
+            db.add(audit_log)
+            db.delete(policy)
+            db.commit()
+            logger.info("Admin '%s' deleted policy '%s'", admin.username, policy.provider_name)
+            return True
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception as exc:
+            db.rollback()
+            logger.error("Database error while deleting policy '%s': %s", policy_id, exc)
+            raise
 
     @staticmethod
-    def get_audit_logs(db: Session, limit: int = 100) -> List[PolicyAuditLogModel]:
-        """Retrieves history of administrative changes."""
+    def get_audit_logs(db: Session, skip: int = 0, limit: int = 100) -> List[PolicyAuditLogModel]:
+        """Retrieves history of administrative changes with offset and limit pagination."""
         stmt = (
             select(PolicyAuditLogModel)
             .order_by(PolicyAuditLogModel.timestamp.desc())
+            .offset(skip)
             .limit(limit)
         )
         return list(db.execute(stmt).scalars().all())
